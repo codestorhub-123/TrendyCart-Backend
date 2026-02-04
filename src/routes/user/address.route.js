@@ -40,6 +40,14 @@ const controller = require('../../controllers/address.controller');
  *                 type: string
  *               zipCode:
  *                 type: integer
+ *             example:
+ *               userId: "695f3a95a55c171dfc255dbf"
+ *               name: "Home"
+ *               address: "123 Main St"
+ *               city: "New York"
+ *               state: "NY"
+ *               country: "USA"
+ *               zipCode: 10001
  *     responses:
  *       200:
  *         description: Success
@@ -84,6 +92,14 @@ route.post('/create', controller.store);
  *                 type: string
  *               zipCode:
  *                 type: integer
+ *             example:
+ *               userId: "695f3a95a55c171dfc255dbf"
+ *               name: "Office"
+ *               address: "456 Business Ave"
+ *               city: "San Francisco"
+ *               state: "CA"
+ *               country: "USA"
+ *               zipCode: 94105
  *     responses:
  *       200:
  *         description: Success

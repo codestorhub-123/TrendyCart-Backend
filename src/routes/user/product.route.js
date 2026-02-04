@@ -289,7 +289,6 @@ route.get('/getRelatedProductsByCategory', controller.getRelatedProductsByCatego
  *               - sellerId
  *               - shippingCharges
  *               - productCode
- *               - attributes
  *               - productSaleType
  *               - mainImage
  *             properties:
@@ -376,7 +375,11 @@ route.get('/getRelatedProductsByCategory', controller.getRelatedProductsByCatego
  *       200:
  *         description: Success
  */
-route.post('/create', controller.create);
+const multer = require("multer");
+const storage = require("../../../utils/multer");
+const upload = multer({ storage: storage });
+
+route.post('/create', upload.fields([{ name: 'mainImage', maxCount: 1 }, { name: 'images', maxCount: 10 }]), controller.create);
 
 /**
  * @swagger

@@ -17,7 +17,6 @@ exports.user_auth = async (req, res, next) => {
             '/admin/forgotPassword',
             '/admin/setPassword',
             '/admin/create',
-            '/reel/detailsOfReel',
             '/storage',
         ];
 
@@ -38,7 +37,8 @@ exports.user_auth = async (req, res, next) => {
         const roleRouteAccess = {
             admin: ['/admin', '/admin-agency', '/agency'],
             agency: ['/admin-agency', '/agency'],
-            user: ['/user', '/common', '/host']
+            user: ['/user', '/common', '/host'],
+            guest: ['/user', '/common']
         };
         const token = authHeader.split(' ')[1];
         try {
@@ -54,6 +54,20 @@ exports.user_auth = async (req, res, next) => {
 
             if (!isAllowed) {
                 return RESPONSE.error(res, 403, 4444);
+            }
+
+            // 🛑 EXTRA SAFETY: Guest can ONLY access specific sub-routes even if /user is allowed
+            if (decoded.role == 'guest') {
+                const guestAllowedSubRoutes = [
+                    '/product',
+                    '/category',
+                    '/reel'
+                ];
+                const isGuestAccessValid = guestAllowedSubRoutes.some(route => normalizedPath.includes(route));
+
+                if (!isGuestAccessValid) {
+                    return RESPONSE.error(res, 403, 4444, 'Access denied for guest role');
+                }
             }
 
             if (decoded.role == 'user') {
@@ -72,10 +86,14 @@ exports.user_auth = async (req, res, next) => {
                 }
                 req.admin = decoded;
                 next();
+            } else if (decoded.role == 'guest') {
+                req.user = decoded;
+                next();
             } else {
                 return RESPONSE.error(res, 403, 4444);
             }
         } catch (err) {
+            console.error('CRITICAL AUTH ERROR:', err.message);
             return RESPONSE.error(res, 500, 9999, err.message);
         }
     } catch (e) {

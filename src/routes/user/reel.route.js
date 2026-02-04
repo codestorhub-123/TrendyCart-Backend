@@ -21,7 +21,7 @@ const upload = multer({ storage });
  *     parameters:
  *       - in: query
  *         name: userId
- *         required: true
+ *         required: false
  *         schema:
  *           type: string
  *       - in: query

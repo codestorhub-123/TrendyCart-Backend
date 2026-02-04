@@ -43,14 +43,16 @@ const UserController = require("../../controllers/user.controller");
  *                 type: string
  *               fcmToken:
  *                 type: string
- *               identity:
- *                 type: string
- *                 description: Unique identity from provider
- *               mobileNumber:
- *                 type: string
  *               User:
  *                  type: string
  *                  description: Email or User identifier
+ *             example:
+ *               identity: "google_id_123"
+ *               loginType: "1"
+ *               email: "user@example.com"
+ *               firstName: "John"
+ *               lastName: "Doe"
+ *               image: "http://example.com/image.jpg"
  *     responses:
  *       200:
  *         description: Success
@@ -122,6 +124,10 @@ route.get("/login", UserController.getLoginToggle);
  *                 type: integer
  *               password:
  *                 type: string
+ *             example:
+ *               email: "user@example.com"
+ *               loginType: 3
+ *               password: "password123"
  *     responses:
  *       200:
  *         description: Check result
@@ -149,6 +155,9 @@ route.post("/checkUser", UserController.checkUser);
  *                 type: string
  *               password:
  *                 type: string
+ *             example:
+ *               email: "user@example.com"
+ *               password: "password123"
  *     responses:
  *       200:
  *         description: Password verification result
@@ -218,6 +227,12 @@ route.get("/profile", UserController.getProfile);
  *                 type: string
  *               mobileNumber:
  *                 type: string
+ *             example:
+ *               userId: "695f3a95a55c171dfc255dbf"
+ *               firstName: "John"
+ *               lastName: "Doe"
+ *               email: "john.doe@example.com"
+ *               gender: "male"
  *     responses:
  *       200:
  *         description: Profile updated successfully
@@ -256,6 +271,10 @@ route.patch("/update", upload.single("image"), UserController.updateProfile);
  *                 type: string
  *               confirmPass:
  *                 type: string
+ *             example:
+ *               oldPass: "oldPass123"
+ *               newPass: "newPass123"
+ *               confirmPass: "newPass123"
  *     responses:
  *       200:
  *         description: Password updated result
@@ -286,6 +305,10 @@ route.patch("/updatePassword", UserController.updatePassword);
  *                 type: string
  *               confirmPassword:
  *                 type: string
+ *             example:
+ *               email: "user@example.com"
+ *               newPassword: "newPass123"
+ *               confirmPassword: "newPass123"
  *     responses:
  *       200:
  *         description: Password set successfully

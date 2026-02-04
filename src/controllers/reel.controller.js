@@ -15,8 +15,8 @@ const config = { baseURL: getApiBase() };
 
 exports.getReelsForUser = async (req, res) => {
   try {
-    // ✅ USER FROM JWT (no query userId)
-    const userId = new mongoose.Types.ObjectId(req.user.id);
+    // ✅ USER FROM JWT (handle guest)
+    const userId = (req.user && req.user.id) ? new mongoose.Types.ObjectId(req.user.id) : null;
 
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 20;
@@ -26,13 +26,15 @@ exports.getReelsForUser = async (req, res) => {
       ? new mongoose.Types.ObjectId(req.query.reelId)
       : null;
 
-    // ✅ FAST USER CHECK (fail fast)
-    const user = await User.findById(userId).select("_id isBlock").lean();
-    if (!user) {
-      return res.status(404).json({ status: false, message: get_message(1019) });
-    }
-    if (user.isBlock) {
-      return res.status(403).json({ status: false, message: get_message(1017) });
+    // ✅ FAST USER CHECK (only if logged in)
+    if (userId) {
+      const user = await User.findById(userId).select("_id isBlock").lean();
+      if (!user) {
+        return res.status(404).json({ status: false, message: get_message(1019) });
+      }
+      if (user.isBlock) {
+        return res.status(403).json({ status: false, message: get_message(1017) });
+      }
     }
 
     // ✅ MATCH QUERY (index friendly)

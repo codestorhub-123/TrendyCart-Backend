@@ -8,8 +8,34 @@ const controller = require('../../controllers/seller.controller');
  *   post:
  *     summary: Seller login
  *     tags: [Seller]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *               - password
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 example: seller@example.com
+ *               password:
+ *                 type: string
+ *                 example: "123456"
  *     responses:
- *       200: { description: Success }
+ *       200:
+ *         description: Success
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status: { type: boolean }
+ *                 message: { type: string }
+ *                 token: { type: string }
+ *                 seller: { type: object }
  */
 route.post('/login', controller.login);
 

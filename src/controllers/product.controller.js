@@ -64,10 +64,6 @@ const parseAndValidateAttributes = (attrInput, res, files) => {
       if (files) deleteFiles(files);
       return { error: res.status(200).json({ status: false, message: `Attribute '${attr.name}' must have at least one valid value in 'values'` }) };
     }
-    if (!attr.image || typeof attr.image !== "string" || !attr.image.trim()) {
-      if (files) deleteFiles(files);
-      return { error: res.status(200).json({ status: false, message: `Attribute '${attr.name}' must have a valid 'image'` }) };
-    }
   }
   return { attributes };
 };
@@ -125,9 +121,17 @@ exports.categorywiseAllProducts = async (req, res) => {
   try {
     const page = req.query.page ? Math.max(parseInt(req.query.page), 1) : 1;
     const pageLimit = req.query.limit ? Math.max(parseInt(req.query.limit), 1) : 10;
+    const { categoryId } = req.query;
+
+    if (!categoryId || !mongoose.Types.ObjectId.isValid(categoryId)) {
+      return res.status(200).json({
+        status: false,
+        message: "Invalid or missing categoryId",
+      });
+    }
 
     const _categoryId = new mongoose.Types.ObjectId(categoryId);
-    const _userId = new mongoose.Types.ObjectId(req.user.id);
+    const _userId = (req.user && req.user.id) ? new mongoose.Types.ObjectId(req.user.id) : null;
 
     const matchStage = {
       category: _categoryId,
@@ -135,6 +139,14 @@ exports.categorywiseAllProducts = async (req, res) => {
       isOutOfStock: false,
       isDeleted: { $ne: true }
     };
+
+    // DEBUG: Check how many products exist for this category total
+    const debugCount = await Product.countDocuments({ category: _categoryId });
+    console.log(`DEBUG: Category ${_categoryId} has ${debugCount} total products.`);
+    if (debugCount > 0) {
+      const sample = await Product.findOne({ category: _categoryId }).select('productName createStatus isOutOfStock isDeleted');
+      console.log(`DEBUG: Sample product in category:`, sample);
+    }
 
     const [totalCount, category, products] = await Promise.all([
       // 🔹 Fast count (indexed)
@@ -243,6 +255,27 @@ exports.categorywiseAllProducts = async (req, res) => {
       ]),
     ]);
 
+    // 🔹 Sanitize image paths
+    const sanitizedProducts = products.map((p) => {
+      if (p.mainImage) {
+        let path = p.mainImage.replace(/\\/g, "/");
+        if (path.includes("/storage/")) {
+          path = "/storage/" + path.split("/storage/")[1];
+        }
+        p.mainImage = path;
+      }
+      if (Array.isArray(p.images)) {
+        p.images = p.images.map((img) => {
+          let path = img.replace(/\\/g, "/");
+          if (path.includes("/storage/")) {
+            path = "/storage/" + path.split("/storage/")[1];
+          }
+          return path;
+        });
+      }
+      return p;
+    });
+
     if (!category) {
       return res.status(200).json({
         status: false,
@@ -256,7 +289,7 @@ exports.categorywiseAllProducts = async (req, res) => {
       totalCount,
       totalPages: Math.ceil(totalCount / pageLimit),
       currentPage: page,
-      product: products || [],
+      product: sanitizedProducts || [],
     });
   } catch (error) {
     console.error("categorywiseAllProducts error:", error);
@@ -287,7 +320,7 @@ exports.detail = async (req, res) => {
     }
 
     const _productId = new mongoose.Types.ObjectId(productId);
-    const _userId = new mongoose.Types.ObjectId(req.user.id);
+    const _userId = (req.user && req.user.id) ? new mongoose.Types.ObjectId(req.user.id) : null;
 
     const productDetails = await Product.aggregate([
       // 🔹 Fast fail
@@ -661,7 +694,7 @@ exports.searchProduct = async (req, res) => {
 
 exports.filterWiseProduct = async (req, res) => {
   try {
-    const userId = new mongoose.Types.ObjectId(req.user.id);
+    const userId = (req.user && req.user.id) ? new mongoose.Types.ObjectId(req.user.id) : null;
     const page = req.body.page ? parseInt(req.body.page) : 1;
     const limit = req.body.limit ? parseInt(req.body.limit) : 10;
 
@@ -752,7 +785,7 @@ exports.filterWiseProduct = async (req, res) => {
     const totalCount = result.metadata[0] ? result.metadata[0].total : 0;
     const paginatedProducts = result.data;
 
-    if (!user) {
+    if (userId && !user) {
       return res.status(404).json({ status: false, message: get_message(1019) });
     }
 
@@ -776,25 +809,27 @@ exports.filterWiseProduct = async (req, res) => {
 
 exports.geAllNewCollection = async (req, res) => {
   try {
-    const userId = new mongoose.Types.ObjectId(req.user.id);
+    const userId = (req.user && req.user.id) ? new mongoose.Types.ObjectId(req.user.id) : null;
 
     const page = Math.max(parseInt(req.query.page) || 1, 1);
     const limit = Math.max(parseInt(req.query.limit) || 10, 1);
 
-    // 1️⃣ Validate user FIRST (fail fast)
-    const user = await User.findById(userId).select("_id isBlock");
-    if (!user) {
-      return res.status(404).json({
-        status: false,
-        message: get_message(1019),
-      });
-    }
+    // 1️⃣ Validate user FIRST (fail fast) - skip for guest
+    if (userId) {
+      const user = await User.findById(userId).select("_id isBlock");
+      if (!user) {
+        return res.status(404).json({
+          status: false,
+          message: get_message(1019),
+        });
+      }
 
-    if (user.isBlock) {
-      return res.status(200).json({
-        status: false,
-        message: get_message(1017),
-      });
+      if (user.isBlock) {
+        return res.status(200).json({
+          status: false,
+          message: get_message(1017),
+        });
+      }
     }
 
     // 2️⃣ Optimized aggregation
@@ -887,15 +922,17 @@ exports.geAllNewCollection = async (req, res) => {
 
 exports.justForYouProducts = async (req, res) => {
   try {
-    const userId = new mongoose.Types.ObjectId(req.user.id);
+    const userId = (req.user && req.user.id) ? new mongoose.Types.ObjectId(req.user.id) : null;
 
-    // 1️⃣ Validate user
-    const user = await User.findById(userId).select("_id isBlock");
-    if (!user) {
-      return res.status(200).json({ status: false, message: "User not found." });
-    }
-    if (user.isBlock) {
-      return res.status(200).json({ status: false, message: "You are blocked by admin." });
+    // 1️⃣ Validate user - skip for guest
+    if (userId) {
+      const user = await User.findById(userId).select("_id isBlock");
+      if (!user) {
+        return res.status(200).json({ status: false, message: "User not found." });
+      }
+      if (user.isBlock) {
+        return res.status(200).json({ status: false, message: "You are blocked by admin." });
+      }
     }
 
     // 2️⃣ Get user's favorite products + categories
@@ -1140,10 +1177,23 @@ exports.featuredProducts = async (req, res) => {
       },
     ]);
 
+    // 🔹 Sanitize image paths
+    const data = popularProducts.map((p) => {
+      if (p.mainImage) {
+        // Remove base URL if exists and replace backslashes
+        let path = p.mainImage.replace(/\\/g, "/");
+        if (path.includes("/storage/")) {
+          path = "/storage/" + path.split("/storage/")[1];
+        }
+        p.mainImage = path;
+      }
+      return p;
+    });
+
     return res.status(200).json({
       status: true,
       message: "Retrieve popular/featured products successful.",
-      data: popularProducts,
+      data,
     });
   } catch (error) {
     console.error("featuredProducts error:", error);
@@ -1176,7 +1226,7 @@ exports.getRelatedProductsByCategory = async (req, res) => {
       });
     }
 
-    const userId = new mongoose.Types.ObjectId(req.user.id);
+    const userId = (req.user && req.user.id) ? new mongoose.Types.ObjectId(req.user.id) : null;
     const productObjectId = new mongoose.Types.ObjectId(productId);
     const categoryObjectId = new mongoose.Types.ObjectId(categoryId);
 
@@ -1290,7 +1340,12 @@ exports.create = async (req, res) => {
     console.log("req.body: ", req.body);
     console.log("req.files: ", req.files);
 
-    const requiredFields = ["productName", "description", "price", "category", "subCategory", "sellerId", "shippingCharges", "productCode", "attributes", "productSaleType"];
+    if (!req.body) {
+      if (req.files) deleteFiles(req.files);
+      return res.status(200).json({ status: false, message: "Request body is missing." });
+    }
+
+    const requiredFields = ["productName", "description", "price", "category", "subCategory", "sellerId", "shippingCharges", "productCode", "productSaleType"];
 
     for (const field of requiredFields) {
       if (!req.body[field]) {
@@ -1316,7 +1371,11 @@ exports.create = async (req, res) => {
 
     if (!category || !subCategory || !seller) {
       if (req.files) deleteFiles(req.files);
-      return res.status(200).json({ status: false, message: "Invalid category, subCategory, or seller." });
+      const invalidFields = [];
+      if (!category) invalidFields.push("category");
+      if (!subCategory) invalidFields.push("subCategory");
+      if (!seller) invalidFields.push("sellerId");
+      return res.status(200).json({ status: false, message: `Invalid IDs: ${invalidFields.join(", ")}` });
     }
 
     if (existProduct) {
@@ -1329,20 +1388,18 @@ exports.create = async (req, res) => {
       });
     }
 
-    let attributes;
-    if (typeof req.body.attributes === "string") {
-      console.log("attributes in body: ", typeof req.body.attributes);
-
-      attributes = JSON.parse(req.body.attributes);
-    } else if (typeof req.body.attributes === "object") {
-      console.log("attributes in body: ", typeof req.body.attributes);
-
-      attributes = req.body.attributes;
-    } else {
-      return res.status(200).json({
-        status: false,
-        message: "Invalid attributes format",
-      });
+    let attributes = [];
+    if (req.body.attributes) {
+      if (typeof req.body.attributes === "string") {
+        try {
+          attributes = JSON.parse(req.body.attributes);
+        } catch (e) {
+          if (req.files) deleteFiles(req.files);
+          return res.status(200).json({ status: false, message: "Invalid attributes format" });
+        }
+      } else if (typeof req.body.attributes === "object") {
+        attributes = req.body.attributes;
+      }
     }
 
     const product = new Product();
@@ -1740,7 +1797,6 @@ exports.createProductByAdmin = async (req, res) => {
     if (!sellerId) missingFields.push("sellerId");
     if (shippingCharges === undefined || shippingCharges === null || shippingCharges === "") missingFields.push("shippingCharges");
     if (!productCode) missingFields.push("productCode");
-    if (!attrInput) missingFields.push("attributes");
 
     if (missingFields.length > 0) {
       if (req.files) deleteFiles(req.files);
@@ -1777,8 +1833,12 @@ exports.createProductByAdmin = async (req, res) => {
       });
     }
 
-    const { error, attributes } = parseAndValidateAttributes(attrInput, res, req.files);
-    if (error) return;
+    let attributes = [];
+    if (attrInput) {
+      const result = parseAndValidateAttributes(attrInput, res, req.files);
+      if (result.error) return;
+      attributes = result.attributes;
+    }
 
     const product = new Product({
       productName: productName.trim(),
@@ -1796,11 +1856,11 @@ exports.createProductByAdmin = async (req, res) => {
     });
 
     if (req.files.mainImage) {
-      product.mainImage = Config.baseURL + req.files.mainImage[0].path;
+      product.mainImage = "/storage/" + req.files.mainImage[0].filename;
     }
 
     if (req.files.images) {
-      product.images = req.files.images.map((img) => Config.baseURL + img.path);
+      product.images = req.files.images.map((img) => "/storage/" + img.filename);
     }
 
     await product.save();
@@ -1883,7 +1943,7 @@ exports.update = async (req, res) => {
       if (currentMainPath && fs.existsSync("storage" + currentMainPath)) {
         fs.unlinkSync("storage" + currentMainPath);
       }
-      product.mainImage = Config.baseURL + req.files.mainImage[0].path;
+      product.mainImage = "/storage/" + req.files.mainImage[0].filename;
     }
 
     let removeIndexes = req.body.removeImageIndexes;
@@ -1907,7 +1967,7 @@ exports.update = async (req, res) => {
     }
 
     if (req.files?.images) {
-      product.images.push(...req.files.images.map(img => Config.baseURL + img.path));
+      product.images.push(...req.files.images.map(img => "/storage/" + img.filename));
     }
 
     if (req.body.attributes) {
@@ -2135,10 +2195,22 @@ exports.popularProducts = async (req, res) => {
       },
     ]);
 
+    // 🔹 Sanitize image paths
+    const sanitizedProducts = products.map((p) => {
+      if (p.mainImage) {
+        let path = p.mainImage.replace(/\\/g, "/");
+        if (path.includes("/storage/")) {
+          path = "/storage/" + path.split("/storage/")[1];
+        }
+        p.mainImage = path;
+      }
+      return p;
+    });
+
     return res.status(200).json({
       status: true,
       message: "Popular products fetched successfully.",
-      products,
+      products: sanitizedProducts,
     });
   } catch (error) {
     console.error("popularProducts error:", error);
@@ -2150,7 +2222,7 @@ exports.isOutOfStock = async (req, res) => {
   try {
     const { productId } = req.query;
     if (!productId) {
-      return res.status(200).json({ status: false, massage: "productId must be required!" });
+      return res.status(200).json({ status: false, message: "productId must be required!" });
     }
 
     const product = await Product.findById(productId)
@@ -2183,7 +2255,7 @@ exports.isNewCollection = async (req, res) => {
   try {
     const { productId } = req.query;
     if (!productId) {
-      return res.status(200).json({ status: false, massage: "productId must be required!!" });
+      return res.status(200).json({ status: false, message: "productId must be required!!" });
     }
 
     const product = await Product.findById(productId)

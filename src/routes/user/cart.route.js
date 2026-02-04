@@ -34,8 +34,14 @@ const controller = require('../../controllers/cart.controller');
  *                 items:
  *                   type: object
  *                   example:
+ *                 example:
  *                     name: "Material"
  *                     value: "wood"
+ *             example:
+ *               userId: "695f3a95a55c171dfc255dbf"
+ *               productId: "69832fa865ac46197edeac20"
+ *               productQuantity: 1
+ *               attributesArray: []
  *     responses:
  *       200:
  *         description: Success
@@ -76,6 +82,11 @@ route.post('/addToCart', controller.addToCart);
  *                 example:
  *                     name: "Material"
  *                     value: "wood"
+ *             example:
+ *               userId: "695f3a95a55c171dfc255dbf"
+ *               productId: "69832fa865ac46197edeac20"
+ *               productQuantity: 1
+ *               attributesArray: []
  *     responses:
  *       200:
  *         description: Success
