@@ -25,19 +25,7 @@ exports.fetchActiveSubCategories = async (req, res) => {
     try {
         const subCategories = await SubCategory.find().select("_id name image createdAt").sort({ createdAt: 1 }).lean();
 
-        const isLocal = config.baseURL.includes("localhost") || config.baseURL.includes("127.0.0.1");
 
-        subCategories.forEach((sub) => {
-            if (sub.image && sub.image.includes("/storage/")) {
-                // If local and image is already remote (not localhost), keep it remote
-                if (isLocal && sub.image.startsWith("http") && !sub.image.includes("localhost") && !sub.image.includes("127.0.0.1")) {
-                    return;
-                }
-
-                const relativePath = sub.image.substring(sub.image.indexOf("/storage/"));
-                sub.image = config.baseURL.replace(/\/$/, "") + relativePath;
-            }
-        });
 
         return res.status(200).json({
             status: true,
@@ -68,7 +56,7 @@ exports.create = async (req, res) => {
         const subCategory = new SubCategory();
 
         subCategory.name = req.body.name.trim();
-        subCategory.image = config.baseURL + req?.file?.path.replace(/\\/g, "/");
+        subCategory.image = "/storage/" + req.file.filename;
         subCategory.category = category._id;
 
         category.subCategory.push(subCategory);
@@ -114,7 +102,7 @@ exports.update = async (req, res) => {
                 }
             }
 
-            subCategory.image = config.baseURL + req?.file?.path.replace(/\\/g, "/");
+            subCategory.image = "/storage/" + req.file.filename;
         }
 
         subCategory.name = req?.body?.name ? req?.body?.name.trim() : subCategory.name;

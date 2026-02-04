@@ -177,33 +177,7 @@ route.post("/checkPassword", UserController.checkPassword);
  */
 route.get("/profile", UserController.getProfile);
 
-//get all users for admin panel
-/**
- * @swagger
- * /user/:
- *   get:
- *     summary: Get all users (Admin)
- *     tags: [User Profile]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: query
- *         name: start
- *         schema:
- *           type: integer
- *           default: 1
- *         description: Page number
- *       - in: query
- *         name: limit
- *         schema:
- *           type: integer
- *           default: 10
- *         description: Items per page
- *     responses:
- *       200:
- *         description: List of users
- */
-route.get("/", UserController.getAllUsers);
+
 
 //update profile of user
 /**
@@ -317,25 +291,6 @@ route.patch("/updatePassword", UserController.updatePassword);
  *         description: Password set successfully
  */
 route.post("/setPassword", UserController.setPassword);
-
-
-
-//get all top customers (users) for admin panel(dashboard)
-/**
- * @swagger
- * /user/topCustomers:
- *   get:
- *     summary: Get top customers
- *     tags: [User]
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: List of top customers
- */
-route.get("/topCustomers", UserController.topCustomers);
-
-
 
 /**
  * @swagger

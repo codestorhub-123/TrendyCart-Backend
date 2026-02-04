@@ -1401,11 +1401,11 @@ exports.create = async (req, res) => {
     product.createStatus = global.settingJSON.isAddProductRequest ? "Pending" : "Approved";
 
     if (req.files.mainImage) {
-      product.mainImage = Config.baseURL + req.files.mainImage[0].path;
+      product.mainImage = "/storage/" + req.files.mainImage[0].filename;
     }
 
     if (req.files.images) {
-      product.images = req.files.images.map((img) => Config.baseURL + img.path);
+      product.images = req.files.images.map((img) => "/storage/" + img.filename);
     }
 
     await product.save();

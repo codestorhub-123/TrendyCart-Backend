@@ -277,7 +277,7 @@ exports.updateProfile = async (req, res) => {
       if (imageParts?.[1] && fs.existsSync("storage" + imageParts[1])) {
         fs.unlinkSync("storage" + imageParts[1]);
       }
-      seller.image = config.baseURL + req.files.image[0].path.replace(/\\/g, "/");
+      seller.image = "/storage/" + req.files.image[0].filename;
     }
 
     await seller.save();
@@ -561,16 +561,12 @@ exports.createFakeSeller = async (req, res) => {
 
     // Image upload (non-blocking)
     if (req.files?.image?.length) {
-      seller.image =
-        config.baseURL +
-        req.files.image[0].path.replace(/\\/g, "/");
+      seller.image = "/storage/" + req.files.image[0].filename;
     }
 
     // Video upload (non-blocking)
     if (req.files?.video?.length) {
-      seller.video =
-        config.baseURL +
-        req.files.video[0].path.replace(/\\/g, "/");
+      seller.video = "/storage/" + req.files.video[0].filename;
     }
 
     // Save seller (single DB call)
@@ -641,9 +637,7 @@ exports.updateFakeSellerProfile = async (req, res) => {
         }
       }
 
-      seller.image =
-        config.baseURL +
-        req.files.image[0].path.replace(/\\/g, "/");
+      seller.image = "/storage/" + req.files.image[0].filename;
     }
 
     // Video update (NON-BLOCKING)
@@ -655,9 +649,7 @@ exports.updateFakeSellerProfile = async (req, res) => {
         }
       }
 
-      seller.video =
-        config.baseURL +
-        req.files.video[0].path.replace(/\\/g, "/");
+      seller.video = "/storage/" + req.files.video[0].filename;
     }
 
     // Save once

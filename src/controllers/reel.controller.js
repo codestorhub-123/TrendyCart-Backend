@@ -272,7 +272,7 @@ exports.uploadReelByAdmin = async (req, res) => {
       }
 
       reel.videoType = 1;
-      reel.video = config.baseURL + req.files.video[0].path.replace(/\\/g, "/");
+      reel.video = "/storage/" + req.files.video[0].filename;
     } else {
       reel.videoType = 2;
       reel.video = req?.body?.video;
@@ -287,7 +287,7 @@ exports.uploadReelByAdmin = async (req, res) => {
       }
 
       reel.thumbnailType = 1;
-      reel.thumbnail = config.baseURL + req.files.thumbnail[0].path.replace(/\\/g, "/");
+      reel.thumbnail = "/storage/" + req.files.thumbnail[0].filename;
     } else {
       reel.thumbnailType = 2;
       reel.thumbnail = req?.body?.thumbnail;
@@ -370,7 +370,7 @@ exports.uploadReel = async (req, res) => {
       }
 
       reel.videoType = 1;
-      reel.video = config.baseURL + req.files.video[0].path.replace(/\\/g, "/");
+      reel.video = "/storage/" + req.files.video[0].filename;
     } else {
       reel.videoType = 2;
       reel.video = video;
@@ -383,7 +383,7 @@ exports.uploadReel = async (req, res) => {
       }
 
       reel.thumbnailType = 1;
-      reel.thumbnail = config.baseURL + req.files.thumbnail[0].path.replace(/\\/g, "/");
+      reel.thumbnail = "/storage/" + req.files.thumbnail[0].filename;
     } else {
       reel.thumbnailType = 2;
       reel.thumbnail = thumbnail;
@@ -487,7 +487,7 @@ exports.updateReelByAdmin = async (req, res) => {
         }
       }
 
-      reel.video = config?.baseURL + req?.files?.video[0].path.replace(/\\/g, "/");
+      reel.video = "/storage/" + req.files.video[0].filename;
     }
 
     if (req?.files?.thumbnail) {
@@ -498,7 +498,7 @@ exports.updateReelByAdmin = async (req, res) => {
         }
       }
 
-      reel.thumbnail = config.baseURL + req.files.thumbnail[0].path.replace(/\\/g, "/");
+      reel.thumbnail = "/storage/" + req.files.thumbnail[0].filename;
     }
 
     if (Number(req?.body.videoType) === 2) {

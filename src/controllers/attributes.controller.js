@@ -82,7 +82,7 @@ exports.insertAttributes = async (req, res) => {
 
         const preparedAttr = {
             name: name.trim(),
-            image: req.file ? req.file.path : "",
+            image: req.file ? "/storage/" + req.file.filename : "",
             fieldType: fieldTypeNum,
             isRequired: String(isRequired).toLowerCase() === "true",
             isActive: String(isActive).toLowerCase() === "true",
@@ -319,7 +319,7 @@ exports.updateAttributes = async (req, res) => {
                     }
                 }
             }
-            attribute.image = req.file.path;
+            attribute.image = "/storage/" + req.file.filename;
         }
 
         await existingAttr.save();

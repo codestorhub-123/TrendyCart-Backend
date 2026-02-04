@@ -123,6 +123,26 @@ exports.fetchAdminEarnings = async (req, res) => {
                     },
                 },
                 {
+                    $addFields: {
+                        productId: {
+                            $convert: {
+                                input: "$productId",
+                                to: "objectId",
+                                onError: null,
+                                onNull: null,
+                            },
+                        },
+                        orderId: {
+                            $convert: {
+                                input: "$orderId",
+                                to: "objectId",
+                                onError: null,
+                                onNull: null,
+                            },
+                        },
+                    },
+                },
+                {
                     $lookup: {
                         from: "products",
                         localField: "productId",
@@ -158,13 +178,22 @@ exports.fetchAdminEarnings = async (req, res) => {
                         amount: 1,
                         commissionPerProductQuantity: 1,
                         date: 1,
-                        sellerName: "$seller.firstName",
-                        lastName: "$seller.lastName",
+                        sellerName: {
+                            $trim: {
+                                input: {
+                                    $concat: [
+                                        { $ifNull: ["$seller.firstName", ""] },
+                                        " ",
+                                        { $ifNull: ["$seller.lastName", ""] },
+                                    ],
+                                },
+                            },
+                        },
                         businessTag: "$seller.businessTag",
                         businessName: "$seller.businessName",
-                        orderId: "$orderDetails.orderId",
-                        productName: "$productDetails.productName",
-                        productImage: "$productDetails.mainImage",
+                        orderId: { $ifNull: ["$orderDetails.orderId", "-"] },
+                        productName: { $ifNull: ["$productDetails.productName", "-"] },
+                        productImage: { $ifNull: ["$productDetails.mainImage", ""] },
                     },
                 },
                 { $sort: { createdAt: -1 } },
@@ -244,6 +273,26 @@ exports.retrieveSellerTransactions = async (req, res) => {
                     },
                 },
                 {
+                    $addFields: {
+                        productId: {
+                            $convert: {
+                                input: "$productId",
+                                to: "objectId",
+                                onError: null,
+                                onNull: null,
+                            },
+                        },
+                        orderId: {
+                            $convert: {
+                                input: "$orderId",
+                                to: "objectId",
+                                onError: null,
+                                onNull: null,
+                            },
+                        },
+                    },
+                },
+                {
                     $lookup: {
                         from: "orders",
                         localField: "orderId",
@@ -269,7 +318,7 @@ exports.retrieveSellerTransactions = async (req, res) => {
                 {
                     $lookup: {
                         from: "users",
-                        localField: "order.userId",
+                        localField: "order.userId", // This is still good as it comes from the matched order
                         foreignField: "_id",
                         as: "user",
                     },
@@ -283,7 +332,7 @@ exports.retrieveSellerTransactions = async (req, res) => {
                 {
                     $lookup: {
                         from: "products",
-                        localField: "order.items.productId",
+                        localField: "productId",
                         foreignField: "_id",
                         as: "product",
                     },
@@ -303,13 +352,22 @@ exports.retrieveSellerTransactions = async (req, res) => {
                 },
                 {
                     $project: {
-                        sellerName: "$seller.firstName",
-                        lastName: "$seller.lastName",
+                        sellerName: {
+                            $trim: {
+                                input: {
+                                    $concat: [
+                                        { $ifNull: ["$seller.firstName", ""] },
+                                        " ",
+                                        { $ifNull: ["$seller.lastName", ""] },
+                                    ],
+                                },
+                            },
+                        },
                         businessTag: "$seller.businessTag",
                         businessName: "$seller.businessName",
                         buyerName: "$user.firstName",
-                        productName: "$product.productName",
-                        orderId: "$order.orderId",
+                        productName: { $ifNull: ["$product.productName", "-"] },
+                        orderId: { $ifNull: ["$order.orderId", "-"] },
                         sellerEarning: "$amount",
                         adminEarning: "$commissionPerProductQuantity",
                         transactionType: 1,

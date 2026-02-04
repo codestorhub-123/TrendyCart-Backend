@@ -33,7 +33,7 @@ exports.create = async (req, res) => {
         }
         withdraw.details = detailsArr;
 
-        withdraw.image = config.baseURL + req.file.path.replace(/\\/g, "/");
+        withdraw.image = "/storage/" + req.file.filename;
         await withdraw.save();
 
         return res.status(200).json({
@@ -73,7 +73,7 @@ exports.update = async (req, res) => {
                 }
             }
 
-            withdraw.image = config.baseURL + req.file.path.replace(/\\/g, "/");
+            withdraw.image = "/storage/" + req.file.filename;
         }
 
         withdraw.name = req.body.name ? req.body.name : withdraw.name;

@@ -30,7 +30,7 @@ exports.create = async (req, res) => {
     const category = new Category();
 
     category.name = req.body.name.trim();
-    category.image = config.baseURL + req?.file?.path.replace(/\\/g, "/");
+    category.image = "/storage/" + req.file.filename;
     await category.save();
 
     return res.status(200).json({ status: true, message: get_message(1088), category: category });
@@ -65,7 +65,7 @@ exports.update = async (req, res) => {
         }
       }
 
-      category.image = config.baseURL + req?.file?.path.replace(/\\/g, "/");
+      category.image = "/storage/" + req.file.filename;
     }
 
     category.name = req.body.name.trim() ? req.body.name.trim() : category.name.trim();

@@ -84,10 +84,8 @@ const userFunction = async (user, data_) => {
         ? data.image
         : !user.image
             ? !file
-                ? user.gender === "female"
-                    ? `${baseURL}storage/erashopUser.png`
-                    : `${baseURL}storage/erashopUser.png`
-                : baseURL + file.path.replace(/\\/g, "/")
+                ? "/storage/erashopUser.png"
+                : "/storage/" + file.filename
             : user.image;
 
     user.firstName = data.firstName ? data.firstName : user.firstName;
@@ -339,6 +337,7 @@ exports.checkUser = async (req, res) => {
 exports.updateProfile = async (req, res) => {
     try {
         if (!req.body.userId) {
+            console.log("Debug updateProfile req.body:", req.body)
             if (req.file) deleteFile(req.file);
             return res.status(400).json({ status: false, message: get_message(1074) });
         }
@@ -363,7 +362,7 @@ exports.updateProfile = async (req, res) => {
                 }
             }
 
-            user.image = process.env.BASE_URL + req.file.path;
+            user.image = "/storage/" + req.file.filename;
         }
 
         user.firstName = req.body.firstName ? req.body.firstName : user.firstName;
@@ -563,6 +562,9 @@ exports.getProfile = async (req, res) => {
         }
 
         const user = await User.findById(req.query.userId).lean();
+        if (user) {
+            console.log("Debug getProfile user:", JSON.stringify(user, null, 2));
+        }
         if (!user) {
             return res.status(404).json({ status: false, message: get_message(1019) });
         }
