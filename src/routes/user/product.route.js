@@ -431,6 +431,12 @@ route.delete('/delete', controller.delete);
  *     tags: [Product]
  *     security:
  *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: sellerId
+ *         required: false
+ *         schema:
+ *           type: string
  *     responses:
  *       200:
  *         description: Success
@@ -445,6 +451,15 @@ route.get('/selectedProducts', controller.selectedProducts);
  *     tags: [Product]
  *     security:
  *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               productId:
+ *                 type: string
  *     responses:
  *       200:
  *         description: Success

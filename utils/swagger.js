@@ -82,6 +82,7 @@ const options = {
       { name: "Seller Wallet", description: "Seller wallet management" },
       { name: "SubCategory", description: "SubCategory management" },
       { name: "Withdraw", description: "Withdrawal management for users" },
+      { name: "User Promo Code", description: "Promo code management for users" },
     ],
   },
   apis: ["./src/routes/**/*.js", "./src/controllers/**/*.js"],

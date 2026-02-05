@@ -1767,7 +1767,7 @@ exports.selectedProducts = async (req, res) => {
 
     return res.status(200).json({
       status: true,
-      message: "when seller going for live then finally, get all products selected by the seller!",
+      message: "Selected products retrieved successfully.",
       totalSelectedProducts: totalSelectedProducts ? totalSelectedProducts : 0,
       SelectedProducts: selectedProducts.length > 0 ? selectedProducts : [],
       liveSellingHistoryId: liveSeller[0]?.liveSellingHistoryId ? liveSeller[0].liveSellingHistoryId : null,

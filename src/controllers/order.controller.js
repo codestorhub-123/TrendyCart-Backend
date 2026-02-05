@@ -104,13 +104,16 @@ exports.create = async (req, res) => {
 
         let orderItems = [];
         let subTotalFromItems = 0;
+        let shippingFromItems = 0;
 
         if (items && items.length > 0) {
             orderItems = items;
-            subTotalFromItems = items.reduce((sum, item) => sum + item.purchasedTimeProductPrice * item.productQuantity, 0);
+            subTotalFromItems = items.reduce((sum, item) => sum + (item.purchasedTimeProductPrice || 0) * (item.productQuantity || 0), 0);
+            shippingFromItems = items.reduce((sum, item) => sum + (item.purchasedTimeShippingCharges || 0), 0);
         } else if (dataFromCart && dataFromCart.items.length > 0) {
             orderItems = dataFromCart.items;
             subTotalFromItems = dataFromCart.subTotal;
+            shippingFromItems = dataFromCart.totalShippingCharges;
         } else {
             return res.status(400).json({ status: false, message: get_message(1113) });
         }
@@ -120,7 +123,7 @@ exports.create = async (req, res) => {
                 ? {
                     items: items,
                     subTotal: subTotalFromItems,
-                    totalShippingCharges: 0,
+                    totalShippingCharges: shippingFromItems || req.body.totalShippingCharges || 0,
                     userId: userObjectId,
                 }
                 : dataFromCart;
@@ -198,31 +201,47 @@ exports.create = async (req, res) => {
             }
         }
 
+        const globalTotalShipping = req.body.totalShippingCharges || 0;
+        let shippingDistributed = false;
+
         for (const [sellerId, items] of Object.entries(itemsBySeller)) {
             const seller = await Seller.findById(sellerId);
             const purchasedTimeadminCommissionCharges = global.settingJSON?.adminCommissionCharges || 0;
             const purchasedTimecancelOrderCharges = global.settingJSON?.cancelOrderCharges || 0;
 
+            let sellerShippingCharges = items.reduce((acc, item) => acc + (item.purchasedTimeShippingCharges || 0), 0);
+
+            // If items don't have shipping but body has totalShippingCharges, give it to the first item of first seller
+            if (sellerShippingCharges === 0 && globalTotalShipping > 0 && !shippingDistributed) {
+                sellerShippingCharges = globalTotalShipping;
+                shippingDistributed = true; // Only distribute once
+            }
+
             const sellerSubTotal = items.reduce((acc, item) => acc + item.purchasedTimeProductPrice * item.productQuantity, 0);
-            const sellerShippingCharges = items.reduce((acc, item) => acc + (item.purchasedTimeShippingCharges || 0), 0);
             const sellerDiscount = discountDistribution[sellerId] || 0;
             const sellerDiscountRate = sellerPercentageDistribution[sellerId] || 0;
             const sellerFinalTotal = sellerSubTotal - sellerDiscount + sellerShippingCharges;
 
             let quantityTotal = 0;
 
-            const updatedItems = items.map((item) => {
+            const updatedItems = items.map((item, index) => {
                 const itemValue = item.purchasedTimeProductPrice * item.productQuantity;
                 const itemDiscount = parseFloat(((itemValue / sellerSubTotal) * sellerDiscount).toFixed(2));
                 const adminCommission = (item.purchasedTimeProductPrice * purchasedTimeadminCommissionCharges) / 100;
                 const commissionPerProductQuantity = adminCommission * item.productQuantity;
                 quantityTotal += parseInt(item?.productQuantity);
 
+                // If we are distributing the global shipping, put it on the first item
+                let itemShipping = item.purchasedTimeShippingCharges || 0;
+                if (index === 0 && sellerShippingCharges > 0 && items.reduce((acc, i) => acc + (i.purchasedTimeShippingCharges || 0), 0) === 0) {
+                    itemShipping = sellerShippingCharges;
+                }
+
                 return {
                     ...item,
                     itemDiscount: itemDiscount,
                     commissionPerProductQuantity: commissionPerProductQuantity,
-                    purchasedTimeShippingCharges: item.purchasedTimeShippingCharges || 0,
+                    purchasedTimeShippingCharges: itemShipping,
                     status: "Pending",
                     date: new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }),
                 };
