@@ -669,19 +669,20 @@ exports.deleteUserAccount = async (req, res) => {
 
         const userId = new mongoose.Types.ObjectId(req.query.userId);
 
-        const [user, userIsSeller] = await Promise.all([User.findById(userId).lean(), Seller.findOne({ userId: userId }).lean()]);
+        const [user, userIsSeller] = await Promise.all([
+            User.findById(userId).lean(),
+            Seller.findOne({ userId: userId }).lean()
+        ]);
 
         if (!user) {
             return res.status(404).json({ status: false, message: get_message(1019) });
         }
 
-        res.status(200).json({ status: true, message: "User account has been deleted." });
-
         if (user) {
             if (user?.image) {
-                const image = user?.image?.split("storage");
-                if (image) {
-                    const imagePath = "storage" + image[1];
+                const imageParts = user?.image?.split("storage");
+                if (imageParts && imageParts[1]) {
+                    const imagePath = "storage" + imageParts[1];
                     if (fs.existsSync(imagePath)) {
                         const imageName = imagePath.split("/").pop();
                         if (imageName !== "erashopUser.png") {
@@ -692,27 +693,27 @@ exports.deleteUserAccount = async (req, res) => {
             }
 
             await Promise.all([
-                Address.deleteMany({ userId: user?._id }),
-                Cart.deleteMany({ userId: user?._id }),
-                Favorite.deleteMany({ userId: user?._id }),
-                Follower.deleteMany({ userId: user?._id }),
-                LikeHistoryOfReel.deleteMany({ userId: user?._id }),
-                Notification.deleteMany({ userId: user?._id }),
-                Order.deleteMany({ userId: user?._id }),
-                PromoCodeCheck.deleteMany({ userId: user?._id }),
-                Rating.deleteMany({ userId: user?._id }),
-                ReportReel.deleteMany({ userId: user?._id }),
-                Review.deleteMany({ userId: user?._id }),
-                SellerRequest.deleteMany({ userId: user?._id }),
-                AuctionBid.deleteMany({ userId: user?._id }),
+                Address.deleteMany({ userId: userId }),
+                Cart.deleteMany({ userId: userId }),
+                Favorite.deleteMany({ userId: userId }),
+                Follower.deleteMany({ userId: userId }),
+                LikeHistoryOfReel.deleteMany({ userId: userId }),
+                Notification.deleteMany({ userId: userId }),
+                Order.deleteMany({ userId: userId }),
+                PromoCodeCheck.deleteMany({ userId: userId }),
+                Rating.deleteMany({ userId: userId }),
+                ReportReel.deleteMany({ userId: userId }),
+                Review.deleteMany({ userId: userId }),
+                SellerRequest.deleteMany({ userId: userId }),
+                AuctionBid.deleteMany({ userId: userId }),
             ]);
         }
 
         if (userIsSeller) {
             if (userIsSeller?.image) {
-                const image = userIsSeller?.image.split("storage");
-                if (image) {
-                    const imagePath = "storage" + image[1];
+                const imageParts = userIsSeller?.image.split("storage");
+                if (imageParts && imageParts[1]) {
+                    const imagePath = "storage" + imageParts[1];
                     if (fs.existsSync(imagePath)) {
                         const imageName = imagePath.split("/").pop();
                         if (imageName !== "erashopUser.png") {
@@ -722,93 +723,90 @@ exports.deleteUserAccount = async (req, res) => {
                 }
             }
 
-            const [products, reelsToDelete] = await Promise.all([Product.find({ seller: userIsSeller?._id }), Reel.find({ sellerId: userIsSeller?._id })]);
+            const [products, reelsToDelete] = await Promise.all([
+                Product.find({ seller: userIsSeller?._id }),
+                Reel.find({ sellerId: userIsSeller?._id })
+            ]);
 
             if (products.length > 0) {
                 await Promise.all(products.map(async (product) => {
                     if (product?.mainImage) {
-                        const image = product?.mainImage?.split("storage");
-                        if (image) {
-                            if (fs.existsSync("storage" + image[1])) {
-                                fs.unlinkSync("storage" + image[1]);
+                        const imageParts = product?.mainImage?.split("storage");
+                        if (imageParts && imageParts[1]) {
+                            const path = "storage" + imageParts[1];
+                            if (fs.existsSync(path)) {
+                                fs.unlinkSync(path);
                             }
                         }
                     }
 
-                    if (product.images) {
-                        if (product?.images?.length > 0) {
-                            for (var i = 0; i < product?.images?.length; i++) {
-                                const images = product?.images[i]?.split("storage");
-                                if (images) {
-                                    if (fs.existsSync("storage" + images[1])) {
-                                        fs.unlinkSync("storage" + images[1]);
-                                    }
+                    if (product.images && product.images.length > 0) {
+                        for (let i = 0; i < product.images.length; i++) {
+                            const imageParts = product.images[i]?.split("storage");
+                            if (imageParts && imageParts[1]) {
+                                const path = "storage" + imageParts[1];
+                                if (fs.existsSync(path)) {
+                                    fs.unlinkSync(path);
                                 }
                             }
                         }
                     }
 
-                    const [cart, order, favorite, review, rating, productRequest, reels] = await Promise.all([
+                    const productRequest = await ProductRequest.find({ productCode: product?.productCode });
+
+                    await Promise.all([
                         Cart.deleteMany({ "items.productId": product?._id }),
                         Order.deleteMany({ "items.productId": product?._id }),
                         Favorite.deleteMany({ productId: product?._id }),
                         Review.deleteMany({ productId: product?._id }),
                         Rating.deleteMany({ productId: product?._id }),
-                        ProductRequest.find({ productCode: product?.productCode }),
-                        Reel.find({ productId: product?._id }),
                         AuctionBid.deleteMany({ productId: product?._id }),
                         SellerWallet.deleteMany({ productId: product?._id }),
                     ]);
 
                     if (productRequest.length > 0) {
-                        await productRequest.forEach(async (product) => {
-                            if (product.mainImage) {
-                                const image = product?.mainImage?.split("storage");
-                                if (image) {
-                                    if (fs.existsSync("storage" + image[1])) {
-                                        fs.unlinkSync("storage" + image[1]);
+                        for (const pr of productRequest) {
+                            if (pr.mainImage) {
+                                const imageParts = pr.mainImage.split("storage");
+                                if (imageParts && imageParts[1]) {
+                                    const path = "storage" + imageParts[1];
+                                    if (fs.existsSync(path)) fs.unlinkSync(path);
+                                }
+                            }
+                            if (pr.images && pr.images.length > 0) {
+                                for (const img of pr.images) {
+                                    const imageParts = img.split("storage");
+                                    if (imageParts && imageParts[1]) {
+                                        const path = "storage" + imageParts[1];
+                                        if (fs.existsSync(path)) fs.unlinkSync(path);
                                     }
                                 }
                             }
-
-                            if (product.images) {
-                                if (product.images.length > 0) {
-                                    for (var i = 0; i < product?.images?.length; i++) {
-                                        const images = product?.images[i]?.split("storage");
-                                        if (images) {
-                                            if (fs.existsSync("storage" + images[1])) {
-                                                fs.unlinkSync("storage" + images[1]);
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        });
+                            await pr.deleteOne();
+                        }
                     }
 
+                    const reels = await Reel.find({ productId: product?._id });
                     if (reels.length > 0) {
-                        await reels.forEach(async (reel) => {
+                        for (const reel of reels) {
                             if (reel.video) {
-                                const video = reel?.video?.split("storage");
-                                if (video) {
-                                    if (fs.existsSync("storage" + video[1])) {
-                                        fs.unlinkSync("storage" + video[1]);
-                                    }
+                                const parts = reel.video.split("storage");
+                                if (parts && parts[1] && fs.existsSync("storage" + parts[1])) {
+                                    fs.unlinkSync("storage" + parts[1]);
                                 }
                             }
-
                             if (reel.thumbnail) {
-                                const thumbnail = reel?.thumbnail?.split("storage");
-                                if (thumbnail) {
-                                    if (fs.existsSync("storage" + thumbnail[1])) {
-                                        fs.unlinkSync("storage" + thumbnail[1]);
-                                    }
+                                const parts = reel.thumbnail.split("storage");
+                                if (parts && parts[1] && fs.existsSync("storage" + parts[1])) {
+                                    fs.unlinkSync("storage" + parts[1]);
                                 }
                             }
-
-                            await Promise.all([LikeHistoryOfReel.deleteMany({ reelId: reel?._id }), ReportReel.deleteMany({ reelId: reel?._id })]);
+                            await Promise.all([
+                                LikeHistoryOfReel.deleteMany({ reelId: reel?._id }),
+                                ReportReel.deleteMany({ reelId: reel?._id })
+                            ]);
                             await reel.deleteOne();
-                        });
+                        }
                     }
 
                     await product.deleteOne();
@@ -816,34 +814,34 @@ exports.deleteUserAccount = async (req, res) => {
             }
 
             if (reelsToDelete.length > 0) {
-                await reelsToDelete.map(async (reel) => {
+                for (const reel of reelsToDelete) {
                     if (reel?.thumbnail) {
-                        const thumbnail = reel?.thumbnail?.split("storage");
-                        if (thumbnail) {
-                            if (fs.existsSync("storage" + thumbnail[1])) {
-                                fs.unlinkSync("storage" + thumbnail[1]);
-                            }
+                        const parts = reel.thumbnail.split("storage");
+                        if (parts && parts[1] && fs.existsSync("storage" + parts[1])) {
+                            fs.unlinkSync("storage" + parts[1]);
                         }
                     }
-
                     if (reel?.video) {
-                        const video = reel?.video?.split("storage");
-                        if (video) {
-                            if (fs.existsSync("storage" + video[1])) {
-                                fs.unlinkSync("storage" + video[1]);
-                            }
+                        const parts = reel.video.split("storage");
+                        if (parts && parts[1] && fs.existsSync("storage" + parts[1])) {
+                            fs.unlinkSync("storage" + parts[1]);
                         }
                     }
-
-                    await Promise.all([LikeHistoryOfReel.deleteMany({ reelId: reel?._id }), ReportReel.deleteMany({ reelId: reel?._id })]);
+                    await Promise.all([
+                        LikeHistoryOfReel.deleteMany({ reelId: reel?._id }),
+                        ReportReel.deleteMany({ reelId: reel?._id })
+                    ]);
                     await reel.deleteOne();
-                });
+                }
             }
 
-            await Seller.deleteOne({ userId: user?._id });
+            await Seller.deleteOne({ userId: userId });
         }
 
-        await User.deleteOne({ _id: user?._id });
+        await User.deleteOne({ _id: userId });
+
+        return res.status(200).json({ status: true, message: "User account and associated data deleted successfully." });
+
     } catch (error) {
         console.log(error);
         return res.status(500).json({

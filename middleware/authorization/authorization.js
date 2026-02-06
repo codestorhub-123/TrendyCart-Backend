@@ -61,7 +61,8 @@ exports.user_auth = async (req, res, next) => {
                 const guestAllowedSubRoutes = [
                     '/product',
                     '/category',
-                    '/reel'
+                    '/reel',
+                    '/currency'
                 ];
                 const isGuestAccessValid = guestAllowedSubRoutes.some(route => normalizedPath.includes(route));
 
