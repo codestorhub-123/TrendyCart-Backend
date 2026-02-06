@@ -49,7 +49,7 @@ route.get('/', controller.getSetting);
  *                 type: string
  *               termsAndConditionsLink:
  *                 type: string
- *               termsConditionText:
+ *               termsAndConditionsText:
  *                 type: string
  *               adminCommissionCharges:
  *                 type: number

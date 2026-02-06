@@ -6,7 +6,7 @@ const settingSchema = new mongoose.Schema(
     privacyPolicyText: { type: String, default: "PRIVACY POLICY TEXT" },
 
     termsAndConditionsLink: { type: String, default: "TERMS AND CONDITION LINK" },
-    termsConditionText: { type: String, default: "TERMS AND CONDITION TEXT" },
+    termsAndConditionsText: { type: String, default: "TERMS AND CONDITION TEXT" },
 
     addressProof: {
       isRequired: { type: Boolean, default: false },
