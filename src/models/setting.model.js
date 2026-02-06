@@ -6,6 +6,7 @@ const settingSchema = new mongoose.Schema(
     privacyPolicyText: { type: String, default: "PRIVACY POLICY TEXT" },
 
     termsAndConditionsLink: { type: String, default: "TERMS AND CONDITION LINK" },
+    termsConditionText: { type: String, default: "TERMS AND CONDITION TEXT" },
 
     addressProof: {
       isRequired: { type: Boolean, default: false },
@@ -45,6 +46,7 @@ const settingSchema = new mongoose.Schema(
     paymentReminderForManualAuction: { type: Number, default: 0 }, //In Minutes
     minPayout: { type: Number, default: 0 }, //seller
 
+    withdrawCharges: { type: Number, default: 0 },
     withdrawLimit: { type: Number, default: 0 },
 
     isAddProductRequest: { type: Boolean, default: false }, //false then directly product add by seller, true then product add through request

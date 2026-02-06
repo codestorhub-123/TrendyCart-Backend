@@ -45,11 +45,21 @@ route.get('/', controller.getSetting);
  *             properties:
  *               privacyPolicyLink:
  *                 type: string
- *               termAndConditionLink:
+ *               privacyPolicyText:
  *                 type: string
- *               commissionPercent:
+ *               termsAndConditionsLink:
+ *                 type: string
+ *               termsConditionText:
+ *                 type: string
+ *               adminCommissionCharges:
  *                 type: number
- *               minValueForWithdrawal:
+ *               cancelOrderCharges:
+ *                 type: number
+ *               withdrawCharges:
+ *                 type: number
+ *               withdrawLimit:
+ *                 type: number
+ *               minPayout:
  *                 type: number
  *     responses:
  *       200:
