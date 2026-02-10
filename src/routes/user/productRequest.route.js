@@ -63,6 +63,8 @@ const upload = multer({ storage });
  *
  *               productSaleType:
  *                 type: number
+ *                 description: "1 for Buy Now, 2 for Auction, 3 for Not for Sale"
+ *                 enum: [1, 2, 3]
  *                 example: 1
  *
  *               price:

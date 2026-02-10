@@ -53,7 +53,7 @@ exports.updateRequest = async (req, res) => {
                     fs.unlinkSync("storage" + image[1]);
                 }
 
-                request.image = process.env.BASE_URL + req.file.path;
+                request.image = "/storage/" + req.file.filename;
             }
         }
 
@@ -251,7 +251,7 @@ exports.createRequest = async (req, res) => {
 
         const request = new Request();
         request.userId = req.user.id;
-        request.image = process.env.BASE_URL + req.file.path;
+        request.image = "/storage/" + req.file.filename;
 
         request.firstName = firstName;
         request.lastName = lastName;

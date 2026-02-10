@@ -322,8 +322,8 @@ route.get('/getRelatedProductsByCategory', controller.getRelatedProductsByCatego
  *                 example: '[{"name": "Color", "values": ["white", "red"], "image": "https://example.com/images/color.png"}]'
  *               productSaleType:
  *                 type: integer
- *                 description: "1 for simple, 2 for auction"
- *                 enum: [1, 2]
+ *                 description: "1 for Buy Now, 2 for Auction, 3 for Not for Sale"
+ *                 enum: [1, 2, 3]
  *                 example: 1
  *               mainImage:
  *                 type: string

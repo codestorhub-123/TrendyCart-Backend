@@ -38,4 +38,24 @@ const controller = require('../../controllers/subCategory.controller');
  */
 route.get('/fetchActiveSubCategories', controller.fetchActiveSubCategories);
 
+/**
+ * @swagger
+ * /user/subCategory/categoryWiseSubCategory:
+ *   get:
+ *     summary: get sub-category based on category
+ *     tags: [SubCategory]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: categoryId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Success
+ */
+route.get('/categoryWiseSubCategory', controller.categoryWiseSubCategory);
+
 module.exports = route;

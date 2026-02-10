@@ -9,6 +9,9 @@ exports.user_auth = async (req, res, next) => {
         const exclude_employee_auth_routes = [
             '/auth',
             '/user/login',
+            '/user/seller/login',
+            '/user/seller/fetchSellerProfile',
+            '/user/seller/setPassword',
             '/user/checkUser',
             '/user/checkPassword',
             '/user/setPassword',
@@ -31,13 +34,14 @@ exports.user_auth = async (req, res, next) => {
 
         const authHeader = req.headers.authorization;
         if (!authHeader || !authHeader.startsWith('Bearer ')) {
-            return RESPONSE.error(res, 401, 3001, 'No token provided');
+            return RESPONSE.error(res, 401, 'No token provided', 'No token provided');
         }
         const currentPath = req.path || '';
         const roleRouteAccess = {
             admin: ['/admin', '/admin-agency', '/agency'],
             agency: ['/admin-agency', '/agency'],
             user: ['/user', '/common', '/host'],
+            seller: ['/user', '/common'],
             guest: ['/user', '/common']
         };
         const token = authHeader.split(' ')[1];
@@ -86,6 +90,15 @@ exports.user_auth = async (req, res, next) => {
                     return RESPONSE.error(res, 500, 3002, null);
                 }
                 req.admin = decoded;
+                next();
+            } else if (decoded.role == 'seller') {
+                const seller = await db.Seller.findById(decoded.id);
+                if (!seller) {
+                    return RESPONSE.error(res, 500, 3002, null);
+                } else if (seller.isBlock) {
+                    return RESPONSE.error(res, 500, 3003, null);
+                }
+                req.user = decoded;
                 next();
             } else if (decoded.role == 'guest') {
                 req.user = decoded;

@@ -177,7 +177,7 @@ exports.getProfileByAdmin = async (req, res) => {
 
     const [seller, totalProduct, totalOrder] = await Promise.all([
       Seller.findById(sellerId).select(
-        "firstName lastName businessTag businessName email mobileNumber image address bankDetails isBlock isFake createdAt"
+        "firstName lastName businessTag businessName email mobileNumber image address bankDetails isBlock isFake createdAt followers following userId"
       ).lean(),
       Product.countDocuments({ seller: sellerId, isDeleted: { $ne: true } }),
       Order.countDocuments({ "items.sellerId": sellerId })
@@ -192,6 +192,11 @@ exports.getProfileByAdmin = async (req, res) => {
 
     seller.totalProduct = totalProduct;
     seller.totalOrder = totalOrder;
+
+    // Handle corrupted address string
+    if (seller.address && seller.address.address === "[object Object]") {
+      seller.address.address = "";
+    }
 
     return res.status(200).json({
       status: true,
@@ -242,34 +247,50 @@ exports.updateProfile = async (req, res) => {
     seller.bankDetails = seller.bankDetails || {};
 
     // Basic fields
-    seller.fcmToken = req.body.fcmToken ?? seller.fcmToken;
-    seller.firstName = req.body.firstName ?? seller.firstName;
-    seller.lastName = req.body.lastName ?? seller.lastName;
-    seller.businessTag = req.body.businessTag ?? seller.businessTag;
-    seller.businessName = req.body.businessName ?? seller.businessName;
-    seller.dob = req.body.dob ?? seller.dob;
-    seller.gender = req.body.gender ?? seller.gender;
-    seller.mobileNumber = req.body.mobileNumber ?? seller.mobileNumber;
+    if (req.body.fcmToken && req.body.fcmToken !== "string") seller.fcmToken = req.body.fcmToken;
+    if (req.body.firstName && req.body.firstName !== "string") seller.firstName = req.body.firstName;
+    if (req.body.lastName && req.body.lastName !== "string") seller.lastName = req.body.lastName;
+    if (req.body.businessTag && req.body.businessTag !== "string") seller.businessTag = req.body.businessTag;
+    if (req.body.businessName && req.body.businessName !== "string") seller.businessName = req.body.businessName;
+    if (req.body.dob && req.body.dob !== "string") seller.dob = req.body.dob;
+    if (req.body.gender && req.body.gender !== "string") seller.gender = req.body.gender;
+    if (req.body.mobileNumber && req.body.mobileNumber !== "string") seller.mobileNumber = req.body.mobileNumber;
 
     // Address
-    seller.address.address = req.body.address ?? seller.address.address;
-    seller.address.landMark = req.body.landMark ?? seller.address.landMark;
-    seller.address.city = req.body.city ?? seller.address.city;
-    seller.address.pinCode = req.body.pinCode ?? seller.address.pinCode;
-    seller.address.state = req.body.state ?? seller.address.state;
-    seller.address.country = req.body.country ?? seller.address.country;
+    if (req.body.address && typeof req.body.address === 'object') {
+      const { address, landMark, city, pinCode, state, country } = req.body.address;
+      if (address && address !== "string") seller.address.address = address;
+      if (landMark && landMark !== "string") seller.address.landMark = landMark;
+      if (city && city !== "string") seller.address.city = city;
+      if (pinCode && pinCode !== "string") seller.address.pinCode = pinCode;
+      if (state && state !== "string") seller.address.state = state;
+      if (country && country !== "string") seller.address.country = country;
+    } else {
+      if (req.body.address && req.body.address !== "string") seller.address.address = req.body.address;
+      if (req.body.landMark && req.body.landMark !== "string") seller.address.landMark = req.body.landMark;
+      if (req.body.city && req.body.city !== "string") seller.address.city = req.body.city;
+      if (req.body.pinCode && req.body.pinCode !== "string") seller.address.pinCode = req.body.pinCode;
+      if (req.body.state && req.body.state !== "string") seller.address.state = req.body.state;
+      if (req.body.country && req.body.country !== "string") seller.address.country = req.body.country;
+    }
 
-    // Bank details (strings only)
-    seller.bankDetails.bankBusinessName =
-      req.body.bankBusinessName ?? seller.bankDetails.bankBusinessName;
-    seller.bankDetails.bankName =
-      req.body.bankName ?? seller.bankDetails.bankName;
-    seller.bankDetails.accountNumber =
-      req.body.accountNumber ?? seller.bankDetails.accountNumber;
-    seller.bankDetails.IFSCCode =
-      req.body.IFSCCode ?? seller.bankDetails.IFSCCode;
-    seller.bankDetails.branchName =
-      req.body.branchName ?? seller.bankDetails.branchName;
+    // Bank details
+    if (req.body.bankDetails && typeof req.body.bankDetails === 'object') {
+      const { bankBusinessName, bankName, accountNumber, IFSCCode, branchName } = req.body.bankDetails;
+      if (bankBusinessName && bankBusinessName !== "string") seller.bankDetails.bankBusinessName = bankBusinessName;
+      if (bankName && bankName !== "string") seller.bankDetails.bankName = bankName;
+      if (accountNumber && !isNaN(accountNumber) && accountNumber !== "string" && accountNumber !== 0) seller.bankDetails.accountNumber = Number(accountNumber);
+      if (IFSCCode && IFSCCode !== "string") seller.bankDetails.IFSCCode = IFSCCode;
+      if (branchName && branchName !== "string") seller.bankDetails.branchName = branchName;
+    } else {
+      if (req.body.bankBusinessName && req.body.bankBusinessName !== "string") seller.bankDetails.bankBusinessName = req.body.bankBusinessName;
+      if (req.body.bankName && req.body.bankName !== "string") seller.bankDetails.bankName = req.body.bankName;
+      if (req.body.accountNumber && !isNaN(req.body.accountNumber) && req.body.accountNumber !== "string" && Number(req.body.accountNumber) !== 0) {
+        seller.bankDetails.accountNumber = Number(req.body.accountNumber);
+      }
+      if (req.body.IFSCCode && req.body.IFSCCode !== "string") seller.bankDetails.IFSCCode = req.body.IFSCCode;
+      if (req.body.branchName && req.body.branchName !== "string") seller.bankDetails.branchName = req.body.branchName;
+    }
 
     // Image upload
     if (req.files?.image?.length) {
@@ -542,20 +563,20 @@ exports.createFakeSeller = async (req, res) => {
       }),
 
       address: {
-        address: req.body.address || null,
-        landMark: req.body.landMark || null,
-        city: req.body.city || null,
-        state: req.body.state || null,
-        country: req.body.country || null,
-        pinCode: req.body.pinCode || null,
+        address: (req.body.address && typeof req.body.address === 'object') ? req.body.address.address : (req.body.address || null),
+        landMark: (req.body.address && typeof req.body.address === 'object') ? req.body.address.landMark : (req.body.landMark || null),
+        city: (req.body.address && typeof req.body.address === 'object') ? req.body.address.city : (req.body.city || null),
+        state: (req.body.address && typeof req.body.address === 'object') ? req.body.address.state : (req.body.state || null),
+        country: (req.body.address && typeof req.body.address === 'object') ? req.body.address.country : (req.body.country || null),
+        pinCode: (req.body.address && typeof req.body.address === 'object') ? req.body.address.pinCode : (req.body.pinCode || null),
       },
 
       bankDetails: {
-        bankBusinessName: req.body.bankBusinessName || null,
-        bankName: req.body.bankName || null,
-        accountNumber: req.body.accountNumber || null,
-        IFSCCode: req.body.IFSCCode || null,
-        branchName: req.body.branchName || null,
+        bankBusinessName: (req.body.bankDetails && typeof req.body.bankDetails === 'object') ? req.body.bankDetails.bankBusinessName : (req.body.bankBusinessName || null),
+        bankName: (req.body.bankDetails && typeof req.body.bankDetails === 'object') ? req.body.bankDetails.bankName : (req.body.bankName || null),
+        accountNumber: (req.body.bankDetails && typeof req.body.bankDetails === 'object') ? req.body.bankDetails.accountNumber : (req.body.accountNumber || null),
+        IFSCCode: (req.body.bankDetails && typeof req.body.bankDetails === 'object') ? req.body.bankDetails.IFSCCode : (req.body.IFSCCode || null),
+        branchName: (req.body.bankDetails && typeof req.body.bankDetails === 'object') ? req.body.bankDetails.branchName : (req.body.branchName || null),
       },
     });
 
@@ -627,6 +648,42 @@ exports.updateFakeSellerProfile = async (req, res) => {
     seller.businessName = req.body.businessName ?? seller.businessName;
     seller.gender = req.body.gender ?? seller.gender;
     seller.mobileNumber = req.body.mobileNumber ?? seller.mobileNumber;
+
+    // Ensure nested objects exist
+    seller.address = seller.address || {};
+    seller.bankDetails = seller.bankDetails || {};
+
+    // Address Update
+    if (req.body.address && typeof req.body.address === 'object') {
+      seller.address.address = req.body.address.address ?? seller.address.address;
+      seller.address.landMark = req.body.address.landMark ?? seller.address.landMark;
+      seller.address.city = req.body.address.city ?? seller.address.city;
+      seller.address.pinCode = req.body.address.pinCode ?? seller.address.pinCode;
+      seller.address.state = req.body.address.state ?? seller.address.state;
+      seller.address.country = req.body.address.country ?? seller.address.country;
+    } else {
+      seller.address.address = req.body.address ?? seller.address.address;
+      seller.address.landMark = req.body.landMark ?? seller.address.landMark;
+      seller.address.city = req.body.city ?? seller.address.city;
+      seller.address.pinCode = req.body.pinCode ?? seller.address.pinCode;
+      seller.address.state = req.body.state ?? seller.address.state;
+      seller.address.country = req.body.country ?? seller.address.country;
+    }
+
+    // Bank Details Update
+    if (req.body.bankDetails && typeof req.body.bankDetails === 'object') {
+      seller.bankDetails.bankBusinessName = req.body.bankDetails.bankBusinessName ?? seller.bankDetails.bankBusinessName;
+      seller.bankDetails.bankName = req.body.bankDetails.bankName ?? seller.bankDetails.bankName;
+      seller.bankDetails.accountNumber = req.body.bankDetails.accountNumber ?? seller.bankDetails.accountNumber;
+      seller.bankDetails.IFSCCode = req.body.bankDetails.IFSCCode ?? seller.bankDetails.IFSCCode;
+      seller.bankDetails.branchName = req.body.bankDetails.branchName ?? seller.bankDetails.branchName;
+    } else {
+      seller.bankDetails.bankBusinessName = req.body.bankBusinessName ?? seller.bankDetails.bankBusinessName;
+      seller.bankDetails.bankName = req.body.bankName ?? seller.bankDetails.bankName;
+      seller.bankDetails.accountNumber = req.body.accountNumber ?? seller.bankDetails.accountNumber;
+      seller.bankDetails.IFSCCode = req.body.IFSCCode ?? seller.bankDetails.IFSCCode;
+      seller.bankDetails.branchName = req.body.branchName ?? seller.bankDetails.branchName;
+    }
 
     // Image update (NON-BLOCKING)
     if (req.files?.image?.length) {
@@ -838,34 +895,38 @@ exports.update = async (req, res) => {
     const seller = await Seller.findById(req.user.id);
     if (!seller) return res.status(404).json({ status: false, message: "Seller not found." });
 
+    req.body = req.body || {};
+
     // Update fields
-    seller.firstName = req.body.firstName ?? seller.firstName;
-    seller.lastName = req.body.lastName ?? seller.lastName;
-    seller.businessName = req.body.businessName ?? seller.businessName;
-    seller.businessTag = req.body.businessTag ?? seller.businessTag;
-    seller.mobileNumber = req.body.mobileNumber ?? seller.mobileNumber;
-    seller.email = req.body.email ?? seller.email;
-    seller.gender = req.body.gender ?? seller.gender;
-    seller.dob = req.body.dob ?? seller.dob;
+    if (req.body.firstName && req.body.firstName !== "string") seller.firstName = req.body.firstName;
+    if (req.body.lastName && req.body.lastName !== "string") seller.lastName = req.body.lastName;
+    if (req.body.businessName && req.body.businessName !== "string") seller.businessName = req.body.businessName;
+    if (req.body.businessTag && req.body.businessTag !== "string") seller.businessTag = req.body.businessTag;
+    if (req.body.mobileNumber && req.body.mobileNumber !== "string") seller.mobileNumber = req.body.mobileNumber;
+    if (req.body.email && req.body.email !== "string") seller.email = req.body.email;
+    if (req.body.gender && req.body.gender !== "string") seller.gender = req.body.gender;
+    if (req.body.dob && req.body.dob !== "string") seller.dob = req.body.dob;
 
     // Ensure nested objects exist
     seller.address = seller.address || {};
     seller.bankDetails = seller.bankDetails || {};
 
     // Address
-    if (req.body.address) seller.address.address = req.body.address;
-    if (req.body.city) seller.address.city = req.body.city;
-    if (req.body.state) seller.address.state = req.body.state;
-    if (req.body.country) seller.address.country = req.body.country;
-    if (req.body.pinCode) seller.address.pinCode = req.body.pinCode;
-    if (req.body.landMark) seller.address.landMark = req.body.landMark;
+    if (req.body.address && req.body.address !== "string") seller.address.address = req.body.address;
+    if (req.body.city && req.body.city !== "string") seller.address.city = req.body.city;
+    if (req.body.state && req.body.state !== "string") seller.address.state = req.body.state;
+    if (req.body.country && req.body.country !== "string") seller.address.country = req.body.country;
+    if (req.body.pinCode && req.body.pinCode !== "string") seller.address.pinCode = req.body.pinCode;
+    if (req.body.landMark && req.body.landMark !== "string") seller.address.landMark = req.body.landMark;
 
     // Bank Details
-    if (req.body.bankName) seller.bankDetails.bankName = req.body.bankName;
-    if (req.body.accountNumber) seller.bankDetails.accountNumber = req.body.accountNumber;
-    if (req.body.IFSCCode) seller.bankDetails.IFSCCode = req.body.IFSCCode;
-    if (req.body.branchName) seller.bankDetails.branchName = req.body.branchName;
-    if (req.body.bankBusinessName) seller.bankDetails.bankBusinessName = req.body.bankBusinessName;
+    if (req.body.bankName && req.body.bankName !== "string") seller.bankDetails.bankName = req.body.bankName;
+    if (req.body.accountNumber && !isNaN(req.body.accountNumber) && req.body.accountNumber !== "string" && Number(req.body.accountNumber) !== 0) {
+      seller.bankDetails.accountNumber = Number(req.body.accountNumber);
+    }
+    if (req.body.IFSCCode && req.body.IFSCCode !== "string") seller.bankDetails.IFSCCode = req.body.IFSCCode;
+    if (req.body.branchName && req.body.branchName !== "string") seller.bankDetails.branchName = req.body.branchName;
+    if (req.body.bankBusinessName && req.body.bankBusinessName !== "string") seller.bankDetails.bankBusinessName = req.body.bankBusinessName;
 
 
     if (req.files?.image?.length) {
@@ -873,7 +934,7 @@ exports.update = async (req, res) => {
         const oldImage = seller.image.split("storage")[1];
         if (oldImage && fs.existsSync("storage" + oldImage)) fs.unlinkSync("storage" + oldImage);
       }
-      seller.image = config.baseURL + req.files.image[0].path.replace(/\\/g, "/");
+      seller.image = "/storage/" + req.files.image[0].filename;
     }
 
     await seller.save();

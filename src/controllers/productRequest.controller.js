@@ -136,10 +136,10 @@ exports.updateProductRequest = async (req, res) => {
                 date: new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }),
                 ...auctionFields,
                 mainImage: req.files?.mainImage
-                    ? process.env.BASE_URL + req.files.mainImage[0].path
+                    ? "/storage/" + req.files.mainImage[0].filename
                     : product.mainImage,
                 images: req.files?.images
-                    ? req.files.images.map(f => process.env.BASE_URL + f.path)
+                    ? req.files.images.map(f => "/storage/" + f.filename)
                     : product.images,
             });
 
@@ -187,10 +187,10 @@ exports.updateProductRequest = async (req, res) => {
         });
 
         if (req.files?.mainImage)
-            product.mainImage = process.env.BASE_URL + req.files.mainImage[0].path;
+            product.mainImage = "/storage/" + req.files.mainImage[0].filename;
 
         if (req.files?.images)
-            product.images = req.files.images.map(f => process.env.BASE_URL + f.path);
+            product.images = req.files.images.map(f => "/storage/" + f.filename);
 
         await product.save();
 

@@ -993,15 +993,23 @@ exports.orderDetailsForSeller = async (req, res) => {
             select: "productName mainImage _id",
         });
 
-        orderWithProducts.forEach(order => {
-            order.createdAt = moment(order.createdAt).format("DD/MM/YYYY");
-            order.updatedAt = moment(order.updatedAt).format("DD/MM/YYYY");
-            if (order.items) {
-                order.items.forEach(item => {
-                    if (item.date) item.date = moment(item.date).format("DD/MM/YYYY");
-                });
-            }
-        });
+        // Since the aggregation pipeline already formats 'createdAt' and 'items.date', 
+        // we likely do NOT need to re-format them with moment here. 
+        // If 'updatedAt' needs formatting and isn't handled in aggregation, handle it carefully.
+        // Assuming 'updatedAt' is a Date object from Mongoose, moment(order.updatedAt) is fine.
+        // But if it's already a string or undefined, we should check.
+
+        /* 
+           Simpler approach: 
+           The aggregation returns 'createdAt' as a string "DD/MM/YYYY". 
+           Passing that back into moment("10/02/2026") triggers the warning because it's not ISO.
+           And since it is ALREADY formatted, we don't need to format it again.
+        */
+
+        // orderWithProducts.forEach(order => {
+        //     // order.createdAt is already "DD/MM/YYYY" from $dateToString
+        //     // order.items.date is already "DD/MM/YYYY" from $dateToString
+        // });
 
         return res.status(200).json({
             status: true,
