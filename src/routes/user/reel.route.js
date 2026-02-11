@@ -20,11 +20,6 @@ const upload = multer({ storage });
  *     tags: [Reel]
  *     parameters:
  *       - in: query
- *         name: userId
- *         required: false
- *         schema:
- *           type: string
- *       - in: query
  *         name: reelId
  *         required: false
  *         schema:
@@ -54,11 +49,6 @@ route.get('/getReelsForUser', controller.getReelsForUser);
  *     summary: like or dislike reel
  *     tags: [Reel]
  *     parameters:
- *       - in: query
- *         name: userId
- *         required: true
- *         schema:
- *           type: string
  *       - in: query
  *         name: reelId
  *         required: true

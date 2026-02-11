@@ -28,17 +28,17 @@ const upload = multer({ storage: storage });
  *           schema:
  *             type: object
  *             properties:
- *               productName: { type: string }
- *               description: { type: string }
- *               price: { type: number }
- *               category: { type: string }
- *               subCategory: { type: string }
- *               shippingCharges: { type: number }
- *               productCode: { type: string }
- *               productSaleType: { type: number }
- *               quantity: { type: number }
- *               sellerId: { type: string }
- *               attributes: { type: string, description: "JSON string of attributes array. Example: [{\"name\": \"Color\", \"values\": [\"white\", \"red\"], \"image\": \"url\"}]" }
+ *               productName: { type: string, example: "Classic Watch" }
+ *               description: { type: string, example: "Premium leather strap watch" }
+ *               price: { type: number, example: 1200 }
+ *               category: { type: string, example: "65a123abc123456789012345" }
+ *               subCategory: { type: string, example: "65b456def456789012345678" }
+ *               shippingCharges: { type: number, example: 50 }
+ *               productCode: { type: string, example: "WATCH-001" }
+ *               productSaleType: { type: number, example: 1 }
+ *               quantity: { type: number, example: 10 }
+ *               sellerId: { type: string, example: "65c789ghi789012345678901" }
+ *               attributes: { type: string, description: "JSON string of attributes", example: '[{"name": "Color", "values": ["Red"]}]' }
  *               mainImage: { type: string, format: binary }
  *               images: { type: array, items: { type: string, format: binary } }
  *     responses:
@@ -66,16 +66,16 @@ route.post('/createProductByAdmin', upload.fields([{ name: 'mainImage', maxCount
  *           schema:
  *             type: object
  *             properties:
- *               productName: { type: string }
- *               description: { type: string }
- *               price: { type: number }
- *               category: { type: string }
- *               subCategory: { type: string }
- *               shippingCharges: { type: number }
- *               productCode: { type: string }
- *               productSaleType: { type: number }
- *               quantity: { type: number }
- *               attributes: { type: string, description: "JSON string of attributes array. Example: [{\"name\": \"Color\", \"values\": [\"white\", \"red\"], \"image\": \"url\"}]" }
+ *               productName: { type: string, example: "Updated Watch Name" }
+ *               description: { type: string, example: "Updated description here" }
+ *               price: { type: number, example: 1500 }
+ *               category: { type: string, example: "65a123abc123456789012345" }
+ *               subCategory: { type: string, example: "65b456def456789012345678" }
+ *               shippingCharges: { type: number, example: 60 }
+ *               productCode: { type: string, example: "WATCH-001-UPDATED" }
+ *               productSaleType: { type: number, example: 1 }
+ *               quantity: { type: number, example: 25 }
+ *               attributes: { type: string, example: '[{"name": "Color", "values": ["Blue"]}]' }
  *               mainImage: { type: string, format: binary }
  *               images: { type: array, items: { type: string, format: binary } }
  *     responses:

@@ -15,39 +15,52 @@ exports.list = async (req, res) => {
         message: get_message(1015)
       });
     }
-    console.log("AUTH USER OBJECT:", req.user);
-    console.log("USER ID TYPE:", typeof req.user?.id, typeof req.user?._id);
 
-    const userId = req.user._id
+    const id = req.user._id
       ? req.user._id
       : new mongoose.Types.ObjectId(req.user.id);
+    const role = req.user.role;
 
-    /* ===================== FETCH USER ===================== */
-    const user = await User.findById(userId).select("isBlock").lean();
+    let identity = null;
+    let query = {};
 
-    if (!user) {
-      return res.status(404).json({
+    if (role === 'user') {
+      identity = await User.findById(id).select("isBlock").lean();
+      query = { userId: id };
+    } else if (role === 'seller') {
+      identity = await Seller.findById(id).select("isBlock").lean();
+      query = { sellerId: id };
+    } else {
+      return res.status(403).json({
         status: false,
-        message: get_message(1016)
+        message: "Access denied. Invalid role for notifications."
       });
     }
 
-    if (user.isBlock) {
+    /* ===================== FETCH IDENTITY ===================== */
+    if (!identity) {
+      return res.status(404).json({
+        status: false,
+        message: role === 'user' ? get_message(1016) : "Seller not found!"
+      });
+    }
+
+    if (identity.isBlock) {
       return res.status(403).json({
         status: false,
-        message: get_message(1017)
+        message: role === 'user' ? get_message(1017) : "Seller is blocked!"
       });
     }
 
     /* ===================== FETCH NOTIFICATIONS ===================== */
-    const notification = await Notification.find({ userId })
+    const notification = await Notification.find(query)
       .sort({ createdAt: -1 })
       .lean();
 
     /* ===================== RESPONSE ===================== */
     return res.status(200).json({
       status: true,
-      message: "Retrive the notification list by the user!",
+      message: `Retrieved the notification list for the ${role}!`,
       notification
     });
 

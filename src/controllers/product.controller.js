@@ -698,7 +698,17 @@ exports.filterWiseProduct = async (req, res) => {
     const page = req.body.page ? parseInt(req.body.page) : 1;
     const limit = req.body.limit ? parseInt(req.body.limit) : 10;
 
-    // Filters from body
+    // 1️⃣ Initial checks
+    let user = null;
+    if (userId) {
+      user = await User.findOne({ _id: userId, isBlock: false });
+
+      if (!user) {
+        return res.status(404).json({ status: false, message: get_message(1019) });
+      }
+    }
+
+    // 2️⃣ Build Filters
     let categoryArray = [];
     if (req.body.category) {
       categoryArray = Array.isArray(req.body.category) ? req.body.category.map(id => new mongoose.Types.ObjectId(id)) : [new mongoose.Types.ObjectId(req.body.category)];
@@ -715,81 +725,74 @@ exports.filterWiseProduct = async (req, res) => {
     if (req.body.minPrice) priceQuery.price = { $gte: req.body.minPrice };
     if (req.body.maxPrice) priceQuery.price = { ...priceQuery.price, $lte: req.body.maxPrice };
 
-    const query = {
-      $and: [categoryQuery, subCategoryQuery, priceQuery].filter(q => Object.keys(q).length > 0)
-    };
-    const finalMatchQuery = query.$and.length > 0 ? { $and: [{ createStatus: "Approved", isOutOfStock: false }, ...query.$and] } : { createStatus: "Approved", isOutOfStock: false };
+    const conditions = [{ createStatus: "Approved", isOutOfStock: false }];
+    if (Object.keys(categoryQuery).length) conditions.push(categoryQuery);
+    if (Object.keys(subCategoryQuery).length) conditions.push(subCategoryQuery);
+    if (Object.keys(priceQuery).length) conditions.push(priceQuery);
 
-    const [user, userIsSeller, products] = await Promise.all([
-      User.findOne({ _id: userId, isBlock: false }),
-      Seller.findOne({ userId: userId }).lean(),
-      Product.aggregate([
-        { $match: finalMatchQuery },
-        {
-          $lookup: {
-            from: "favorites",
-            let: { productId: "$_id", userId: userId },
-            pipeline: [
-              {
-                $match: {
-                  $expr: {
-                    $and: [{ $eq: ["$productId", "$$productId"] }, { $eq: ["$userId", userId] }],
-                  },
+    const finalMatchQuery = { $and: conditions };
+
+    // 3️⃣ Aggregation
+    const productsArray = await Product.aggregate([
+      { $match: finalMatchQuery },
+      {
+        $lookup: {
+          from: "favorites",
+          let: { productId: "$_id" },
+          pipeline: [
+            {
+              $match: {
+                $expr: {
+                  $and: [{ $eq: ["$productId", "$$productId"] }, { $eq: ["$userId", userId] }],
                 },
               },
-            ],
-            as: "isFavorite",
-          },
+            },
+          ],
+          as: "isFavorite",
         },
-        {
-          $lookup: {
-            from: "ratings",
-            localField: "_id",
-            foreignField: "productId",
-            as: "productRating",
-          },
+      },
+      {
+        $lookup: {
+          from: "ratings",
+          localField: "_id",
+          foreignField: "productId",
+          as: "productRating",
         },
-        {
-          $project: {
-            _id: 1,
-            mainImage: 1,
-            images: 1,
-            price: 1,
-            shippingCharges: 1,
-            productName: 1,
-            productCode: 1,
-            location: 1,
-            sold: 1,
-            review: 1,
-            isOutOfStock: 1,
-            description: 1,
-            category: 1,
-            seller: 1,
-            createStatus: 1,
-            auctionEndDate: 1,
-            productSaleType: 1,
-            isFavorite: { $cond: [{ $eq: [{ $size: "$isFavorite" }, 0] }, false, true] },
-            ratingAverage: { $ifNull: [{ $avg: "$productRating.rating" }, 0] },
-          },
+      },
+      {
+        $project: {
+          _id: 1,
+          mainImage: 1,
+          images: 1,
+          price: 1,
+          shippingCharges: 1,
+          productName: 1,
+          productCode: 1,
+          location: 1,
+          sold: 1,
+          review: 1,
+          isOutOfStock: 1,
+          description: 1,
+          category: 1,
+          seller: 1,
+          createStatus: 1,
+          auctionEndDate: 1,
+          productSaleType: 1,
+          isFavorite: { $cond: [{ $eq: [{ $size: "$isFavorite" }, 0] }, false, true] },
+          ratingAverage: { $ifNull: [{ $avg: "$productRating.rating" }, 0] },
         },
-        {
-          $facet: {
-            metadata: [{ $count: "total" }],
-            data: [{ $skip: (page - 1) * limit }, { $limit: limit }],
-          },
+      },
+      {
+        $facet: {
+          metadata: [{ $count: "total" }],
+          data: [{ $skip: (page - 1) * limit }, { $limit: limit }],
         },
-      ]),
+      },
     ]);
 
-    const result = products[0];
+    const result = productsArray[0];
     const totalCount = result.metadata[0] ? result.metadata[0].total : 0;
     const paginatedProducts = result.data;
-
-    if (userId && !user) {
-      return res.status(404).json({ status: false, message: get_message(1019) });
-    }
-
-    const filteredProducts = paginatedProducts.filter((p) => !userIsSeller || p.seller.toString() !== userIsSeller._id.toString());
 
     return res.status(200).json({
       status: true,
@@ -797,7 +800,7 @@ exports.filterWiseProduct = async (req, res) => {
       totalCount,
       totalPages: Math.ceil(totalCount / limit),
       currentPage: page,
-      product: filteredProducts,
+      product: paginatedProducts,
     });
   } catch (error) {
     console.log(error);
@@ -1414,6 +1417,7 @@ exports.create = async (req, res) => {
     product.productCode = req.body.productCode;
     product.productSaleType = Number(req.body.productSaleType);
     product.attributes = attributes;
+    product.quantity = Number(req.body.quantity) || 0;
 
     product.processingTime = req.body.processingTime || "";
     product.recipientAddress = req.body.recipientAddress || "";
@@ -1502,24 +1506,20 @@ exports.create = async (req, res) => {
 
 exports.detailforSeller = async (req, res) => {
   try {
-    if (!req.query.productId || !req.query.sellerId) {
+    const { productId, sellerId } = req.query;
+
+    if (!productId || !sellerId) {
       return res.status(200).json({ status: false, message: "Oops ! Invalid details." });
     }
 
-    const [product, seller] = await Promise.all([Product.findById(req.query.productId), Seller.findById(req.query.sellerId)]);
-
-    if (!product) {
-      return res.status(200).json({
-        status: false,
-        message: "No product was found!",
-      });
+    if (!mongoose.Types.ObjectId.isValid(productId) || !mongoose.Types.ObjectId.isValid(sellerId)) {
+      return res.status(200).json({ status: false, message: "Invalid ID format." });
     }
 
-    if (!seller) {
-      return res.status(200).json({ status: false, message: "seller does not found!" });
-    }
-
-    const productData = await Product.find({ _id: product._id, seller: seller._id }).populate([
+    const product = await Product.findOne({
+      _id: new mongoose.Types.ObjectId(productId),
+      seller: new mongoose.Types.ObjectId(sellerId),
+    }).populate([
       { path: "category", select: "name" },
       { path: "subCategory", select: "name" },
       {
@@ -1528,16 +1528,23 @@ exports.detailforSeller = async (req, res) => {
       },
     ]);
 
+    if (!product) {
+      return res.status(200).json({
+        status: false,
+        message: "No product was found for this seller!",
+      });
+    }
+
     return res.status(200).json({
       status: true,
-      message: "Retrive product details for the seller!",
-      product: productData,
+      message: "Retrieved product details for the seller successfully.",
+      product: product,
     });
   } catch (error) {
-    console.log(error);
+    console.error("detailforSeller error:", error);
     return res.status(500).json({
       status: false,
-      error: error.message || "Internal Server Error",
+      message: error.message || "Internal Server Error",
     });
   }
 };
@@ -1564,7 +1571,6 @@ exports.allProductForSeller = async (req, res) => {
 
     const conditions = {
       seller: sellerObjectId,
-      isOutOfStock: false,
     };
 
     if (search && search !== "All" && search.trim() !== "") {
@@ -1851,6 +1857,7 @@ exports.createProductByAdmin = async (req, res) => {
       isAddByAdmin: true,
       shippingCharges: parseFloat(shippingCharges) || 0,
       productCode: productCode.trim(),
+      quantity: Number(req.body.quantity) || 0,
       attributes,
       date: new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }),
     });
@@ -1910,34 +1917,78 @@ exports.update = async (req, res) => {
       return res.status(200).json({ status: false, message: "Product not found!" });
     }
 
-    let category = null;
-    if (req.body.category) {
-      category = await Category.findById(req.body.category).select("_id");
-      if (!category) {
+    // 1️⃣ Category Validation (Fix CastError)
+    let categoryInput = req.body.category;
+    if (Array.isArray(categoryInput)) categoryInput = categoryInput[0];
+
+    if (categoryInput && typeof categoryInput === "string" && categoryInput.trim() !== "" && categoryInput !== "null" && categoryInput !== "undefined") {
+      if (!mongoose.Types.ObjectId.isValid(categoryInput)) {
+        if (req.files) deleteFiles(req.files);
+        return res.status(200).json({ status: false, message: `Invalid Category ID format: ${categoryInput}` });
+      }
+      const categoryObj = await Category.findById(categoryInput).select("_id");
+      if (!categoryObj) {
         if (req.files) deleteFiles(req.files);
         return res.status(200).json({ status: false, message: "Category not found." });
       }
+      product.category = categoryObj._id;
     }
 
-    let subCategory = null;
-    if (req.body.subCategory) {
-      subCategory = await SubCategory.findById(req.body.subCategory).select("_id");
-      if (!subCategory) {
+    // 2️⃣ SubCategory Validation (Fix CastError)
+    let subCategoryInput = req.body.subCategory;
+    if (Array.isArray(subCategoryInput)) subCategoryInput = subCategoryInput[0];
+
+    if (subCategoryInput && typeof subCategoryInput === "string" && subCategoryInput.trim() !== "" && subCategoryInput !== "null" && subCategoryInput !== "undefined") {
+      if (!mongoose.Types.ObjectId.isValid(subCategoryInput)) {
+        if (req.files) deleteFiles(req.files);
+        return res.status(200).json({ status: false, message: `Invalid SubCategory ID format: ${subCategoryInput}` });
+      }
+      const subCategoryObj = await SubCategory.findById(subCategoryInput).select("_id");
+      if (!subCategoryObj) {
         if (req.files) deleteFiles(req.files);
         return res.status(200).json({ status: false, message: "SubCategory not found." });
       }
+      product.subCategory = subCategoryObj._id;
     }
 
-    product.productName = req.body.productName || product.productName;
-    product.description = req.body.description || product.description;
-    product.price = req.body.price || product.price;
-    product.shippingCharges = req.body.shippingCharges || product.shippingCharges;
-    product.category = category ? category._id : product.category;
-    product.subCategory = subCategory ? subCategory._id : product.subCategory;
+    // 3️⃣ Basic fields - Update ONLY if provided (Fix falsy/|| logic)
+    if (req.body.productName !== undefined) product.productName = req.body.productName.trim();
+    if (req.body.description !== undefined) product.description = req.body.description.trim();
+    if (req.body.productCode !== undefined) product.productCode = req.body.productCode.trim();
+    if (req.body.price !== undefined && req.body.price !== "") product.price = parseFloat(req.body.price);
+    if (req.body.shippingCharges !== undefined && req.body.shippingCharges !== "") product.shippingCharges = parseFloat(req.body.shippingCharges);
+    if (req.body.productSaleType !== undefined) product.productSaleType = Number(req.body.productSaleType);
+    if (req.body.quantity !== undefined && req.body.quantity !== "") product.quantity = parseInt(req.body.quantity);
+
+    // 4️⃣ Additional auction/offer fields
+    if (req.body.allowOffer !== undefined) product.allowOffer = req.body.allowOffer === "true";
+    if (req.body.minimumOfferPrice !== undefined) product.minimumOfferPrice = Number(req.body.minimumOfferPrice) || 0;
+    if (req.body.enableAuction !== undefined) product.enableAuction = req.body.enableAuction === "true";
+    if (req.body.auctionStartingPrice !== undefined) product.auctionStartingPrice = Number(req.body.auctionStartingPrice) || 0;
+    if (req.body.enableReservePrice !== undefined) product.enableReservePrice = req.body.enableReservePrice === "true";
+    if (req.body.reservePrice !== undefined) product.reservePrice = Number(req.body.reservePrice) || 0;
+    if (req.body.auctionDuration !== undefined) product.auctionDuration = Number(req.body.auctionDuration) || 0;
+
+    if (req.body.scheduleTime !== undefined && req.body.scheduleTime !== null && `${req.body.scheduleTime}`.trim() !== "") {
+      const m = moment(req.body.scheduleTime, moment.ISO_8601, true);
+      if (m.isValid()) {
+        product.scheduleTime = m.toISOString();
+      }
+    }
+
+    // Recalculate auction dates if necessary
+    if (product.enableAuction && product.auctionDuration > 0 && product.scheduleTime) {
+      const auctionStart = moment(product.scheduleTime);
+      const auctionEnd = auctionStart.clone().add(product.auctionDuration, "days");
+      product.auctionStartDate = auctionStart.toISOString();
+      product.auctionEndDate = auctionEnd.toISOString();
+    }
+
     product.date = new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" });
     product.updateStatus = "Approved";
     product.isUpdateByAdmin = true;
 
+    // 4️⃣ Image Handling - Main Image
     if (req.files?.mainImage?.length) {
       const currentMainPath = product.mainImage?.split("storage")[1];
       if (currentMainPath && fs.existsSync("storage" + currentMainPath)) {
@@ -1946,6 +1997,7 @@ exports.update = async (req, res) => {
       product.mainImage = "/storage/" + req.files.mainImage[0].filename;
     }
 
+    // 5️⃣ Image Handling - Removal
     let removeIndexes = req.body.removeImageIndexes;
     if (typeof removeIndexes === "string") {
       try {
@@ -1966,10 +2018,12 @@ exports.update = async (req, res) => {
       });
     }
 
+    // 6️⃣ Image Handling - Additional Images
     if (req.files?.images) {
       product.images.push(...req.files.images.map(img => "/storage/" + img.filename));
     }
 
+    // 7️⃣ Attributes Validation
     if (req.body.attributes) {
       const { error, attributes } = parseAndValidateAttributes(req.body.attributes, res, req.files);
       if (error) return;

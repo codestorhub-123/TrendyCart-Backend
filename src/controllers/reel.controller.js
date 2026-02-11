@@ -43,6 +43,8 @@ exports.getReelsForUser = async (req, res) => {
         ? {}
         : { isFake: false };
 
+    const role = req.user ? req.user.role : null;
+
     // ✅ AGGREGATION PIPELINE
     const reels = await Reel.aggregate([
       { $match: matchQuery },
@@ -78,7 +80,11 @@ exports.getReelsForUser = async (req, res) => {
                 $expr: {
                   $and: [
                     { $eq: ["$reelId", "$$reelId"] },
-                    { $eq: ["$userId", userId] },
+                    role === "user"
+                      ? { $eq: ["$userId", userId] }
+                      : role === "seller"
+                        ? { $eq: ["$sellerId", userId] } // 'userId' variable holds the ID from token
+                        : { $eq: [1, 0] }, // Nobody (guest or invalid role)
                   ],
                 },
               },
@@ -149,52 +155,67 @@ exports.getReelsForUser = async (req, res) => {
 
 exports.likeOrDislikeOfReel = async (req, res) => {
   try {
-    if (!req.query.userId || !req.query.reelId)
+    if (!req.user || !req.user.id || !req.query.reelId) {
       return res.status(200).json({
         status: false,
         message: get_message(1074),
       });
-
-    const [user, reel, alreadylikedReel] = await Promise.all([
-      User.findOne({ _id: req.query.userId }),
-      Reel.findById(req.query.reelId),
-      LikeHistoryOfReel.findOne({
-        userId: req.query.userId,
-        reelId: req.query.reelId,
-      }),
-    ]);
-
-    if (!user) {
-      return res.status(404).json({ status: false, message: get_message(1019) });
     }
 
-    if (user.isBlock) {
-      return res.status(403).json({ status: false, message: get_message(1017) });
+    const id = new mongoose.Types.ObjectId(req.user.id);
+    const role = req.user.role;
+    const reelId = new mongoose.Types.ObjectId(req.query.reelId);
+
+    let identity = null;
+    let query = { reelId };
+
+    if (role === 'user') {
+      identity = await User.findById(id).select("_id isBlock");
+      query.userId = id;
+    } else if (role === 'seller') {
+      identity = await Seller.findById(id).select("_id isBlock");
+      query.sellerId = id;
+    } else {
+      return res.status(403).json({ status: false, message: "Invalid role for liking reels." });
     }
 
+    if (!identity) {
+      return res.status(404).json({ status: false, message: role === 'user' ? get_message(1019) : get_message(1013) });
+    }
+
+    if (identity.isBlock) {
+      return res.status(403).json({ status: false, message: role === "user" ? get_message(1017) : get_message(1107) });
+    }
+
+    const reel = await Reel.findById(reelId);
     if (!reel) {
       return res.status(404).json({ status: false, message: get_message(1141) });
     }
 
+    const alreadylikedReel = await LikeHistoryOfReel.findOne(query);
+
     if (alreadylikedReel) {
-      await Promise.all([LikeHistoryOfReel.deleteOne({ userId: user._id, reelId: reel._id }), Reel.updateOne({ _id: reel._id, like: { $gt: 0 } }, { $inc: { like: -1 } })]);
+      await Promise.all([
+        LikeHistoryOfReel.deleteOne(query),
+        Reel.updateOne({ _id: reel._id, like: { $gt: 0 } }, { $inc: { like: -1 } })
+      ]);
 
       return res.status(200).json({
         status: true,
-        message: "finally, reel dislike done by the user!",
+        message: `finally, reel dislike done by the ${role}!`,
         isLike: false,
       });
     } else {
-      const likeHistoryOfReel = new LikeHistoryOfReel();
+      const likeHistoryOfReel = new LikeHistoryOfReel(query);
 
-      likeHistoryOfReel.userId = user._id;
-      likeHistoryOfReel.reelId = reel._id;
-
-      await Promise.all([likeHistoryOfReel.save(), reel.updateOne({ $inc: { like: 1 } })]);
+      await Promise.all([
+        likeHistoryOfReel.save(),
+        reel.updateOne({ $inc: { like: 1 } })
+      ]);
 
       return res.status(200).json({
         status: true,
-        message: "finally, reel like done by the user!",
+        message: `finally, reel like done by the ${role}!`,
         isLike: true,
       });
     }
@@ -729,7 +750,9 @@ exports.likeHistoryOfReel = async (req, res) => {
 
     const [reel, likeHistoryOfReel] = await Promise.all([
       Reel.findOne({ _id: req?.query?.reelId }),
-      LikeHistoryOfReel.find({ reelId: req?.query?.reelId }).populate("userId", "firstName lastName image"),
+      LikeHistoryOfReel.find({ reelId: req?.query?.reelId })
+        .populate("userId", "firstName lastName image")
+        .populate("sellerId", "firstName lastName image"),
     ]);
 
     if (!reel) {

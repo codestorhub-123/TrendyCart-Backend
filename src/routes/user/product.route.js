@@ -367,6 +367,9 @@ route.get('/getRelatedProductsByCategory', controller.getRelatedProductsByCatego
  *               auctionDuration:
  *                 type: number
  *                 example: 7
+ *               quantity:
+ *                 type: number
+ *                 example: 50
  *               scheduleTime:
  *                 type: string
  *                 format: date-time
@@ -387,6 +390,17 @@ route.post('/create', upload.fields([{ name: 'mainImage', maxCount: 1 }, { name:
  *   get:
  *     summary: Get product details for seller
  *     tags: [Product]
+ *     parameters:
+ *       - in: query
+ *         name: productId
+ *         required: true
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: sellerId
+ *         required: true
+ *         schema:
+ *           type: string
  *     security:
  *       - bearerAuth: []
  *     responses:
@@ -401,6 +415,30 @@ route.get('/detailforSeller', controller.detailforSeller);
  *   get:
  *     summary: Get all products for seller
  *     tags: [Product]
+ *     parameters:
+ *       - in: query
+ *         name: sellerId
+ *         required: true
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 10
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: saleType
+ *         schema:
+ *           type: string
  *     security:
  *       - bearerAuth: []
  *     responses:
@@ -415,6 +453,12 @@ route.get('/allProductForSeller', controller.allProductForSeller);
  *   delete:
  *     summary: Delete product by seller
  *     tags: [Product]
+ *     parameters:
+ *       - in: query
+ *         name: productId
+ *         required: true
+ *         schema:
+ *           type: string
  *     security:
  *       - bearerAuth: []
  *     responses:

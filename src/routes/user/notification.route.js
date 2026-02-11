@@ -6,16 +6,10 @@ const controller = require('../../controllers/notification.controller');
  * @swagger
  * /user/notification/list:
  *   get:
- *     summary: Get notification list for user
+ *     summary: Get notification list for user or seller
  *     tags: [Notification]
  *     security:
  *       - bearerAuth: []
- *     parameters:
- *       - in: query
- *         name: userId
- *         required: true
- *         schema:
- *           type: string
  *     responses:
  *       200:
  *         description: Success
