@@ -97,7 +97,7 @@ exports.updateRequest = async (req, res) => {
     }
 };
 
-// Accept or decline seller request
+// Accept or decline seller request add
 exports.acceptOrNot = async (req, res) => {
     try {
         const requestId = req.query.sellerRequestId || req.query.requestId;
