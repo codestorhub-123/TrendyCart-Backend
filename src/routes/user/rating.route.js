@@ -13,7 +13,7 @@ const controller = require('../../controllers/rating.controller');
  * @swagger
  * /user/rating/addRating:
  *   post:
- *     summary: Add rating and review to a product
+ *     summary: Add rating to a product
  *     tags: [Rating]
  *     security:
  *       - bearerAuth: []
@@ -35,9 +35,6 @@ const controller = require('../../controllers/rating.controller');
  *                 minimum: 1
  *                 maximum: 5
  *                 example: 4.5
- *               review:
- *                 type: string
- *                 example: "Great product! Highly recommended."
  *     responses:
  *       200:
  *         description: Rating added successfully
@@ -58,7 +55,6 @@ const controller = require('../../controllers/rating.controller');
  *                     userId: "695f3a95a55c171dfc255dbf"
  *                     productId: "6957b97c120b0f910fb6783b"
  *                     rating: 4.5
- *                     review: "Great product! Highly recommended."
  */
 route.post('/addRating', controller.addRating);
 
@@ -67,8 +63,14 @@ route.post('/addRating', controller.addRating);
  * @swagger
  * /user/rating/:
  *   get:
- *     summary: get allProduct avgRating
+ *     summary: Get average rating for a specific product
  *     tags: [Rating]
+ *     parameters:
+ *       - in: query
+ *         name: productId
+ *         required: true
+ *         schema:
+ *           type: string
  *     responses:
  *       200:
  *         description: Ratings fetched successfully

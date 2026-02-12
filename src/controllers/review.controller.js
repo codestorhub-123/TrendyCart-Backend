@@ -1,6 +1,7 @@
 const User = require("../models/user.model");
 const Product = require("../models/product.model");
 const Review = require("../models/review.model");
+const Order = require("../models/order.model");
 const Notification = require("../models/notification.model");
 // const admin = require("../../utils/firebase");
 const moment = require("moment");
@@ -12,10 +13,21 @@ exports.create = async (req, res) => {
             return res.status(400).json({ status: false, message: get_message(1074) });
         }
 
-        const [user, product, reviewExist] = await Promise.all([
-            User.findById(req.body.userId),
-            Product.findOne({ _id: req.body.productId }).populate("seller", "isBlock fcmToken"),
-            Review.findOne({ userId: req.body.userId, productId: req.body.productId }),
+        const { userId, productId, review: reviewText } = req.body;
+
+        const [user, product, reviewExist, deliveredOrder] = await Promise.all([
+            User.findById(userId),
+            Product.findOne({ _id: productId }).populate("seller", "isBlock fcmToken"),
+            Review.findOne({ userId: userId, productId: productId }),
+            Order.findOne({
+                userId: userId,
+                items: {
+                    $elemMatch: {
+                        productId: productId,
+                        status: "Delivered"
+                    }
+                }
+            })
         ]);
 
         if (!user) {
@@ -24,6 +36,14 @@ exports.create = async (req, res) => {
 
         if (!product) {
             return res.status(404).json({ status: false, message: get_message(1059) });
+        }
+
+        // ⭐ Check if product was purchased and delivered
+        if (!deliveredOrder) {
+            return res.status(200).json({
+                status: false,
+                message: "You can only review products that have been delivered to you.",
+            });
         }
 
         if (reviewExist) {
@@ -86,7 +106,7 @@ exports.create = async (req, res) => {
     }
 };
 
-exports.getgetReviews = async (req, res) => {
+exports.getReviews = async (req, res) => {
     try {
         const productId = req.query.productId;
         const page = req.query.page ? parseInt(req.query.page) : 1;

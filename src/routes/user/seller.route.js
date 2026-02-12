@@ -192,4 +192,18 @@ route.patch('/updatePassword', controller.updatePassword);
  */
 route.post('/setPassword', controller.setPassword);
 
+/**
+ * @swagger
+ * /user/seller/dashboard:
+ *   get:
+ *     summary: Get dashboard statistics for seller
+ *     tags: [Seller]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Success
+ */
+route.get('/dashboard', controller.getDashboard);
+
 module.exports = route;

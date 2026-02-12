@@ -28,7 +28,7 @@ const controller = require("../../controllers/review.controller");
  *       200:
  *         description: Success
  */
-route.get("/getreview", controller.getgetReviews);
+route.get("/getreview", controller.getReviews);
 
 /**
  * @swagger

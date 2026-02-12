@@ -43,4 +43,6 @@ const controller = require('../../controllers/sellerWallet.controller');
  */
 route.get('/retrieveSellerWalletHistory', controller.retrieveSellerWalletHistory);
 
+
+
 module.exports = route;

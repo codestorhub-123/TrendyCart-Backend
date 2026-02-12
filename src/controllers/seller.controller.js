@@ -1,4 +1,5 @@
 const Seller = require("../models/seller.model");
+const mongoose = require("mongoose");
 const SellerWallet = require("../models/sellerWallet.model");
 const User = require("../models/user.model");
 const Product = require("../models/product.model");
@@ -864,6 +865,34 @@ exports.getProfile = async (req, res) => {
     if (!seller) {
       return res.status(404).json({ status: false, message: "Seller not found." });
     }
+
+    // Fix: Recalculate wallet balance from transaction history to ensure accuracy
+    const walletAgg = await SellerWallet.aggregate([
+      { $match: { sellerId: seller._id } },
+      {
+        $group: {
+          _id: "$sellerId",
+          totalCredit: {
+            $sum: { $cond: [{ $eq: ["$transactionType", 1] }, "$amount", 0] },
+          },
+          totalDebit: {
+            $sum: { $cond: [{ $eq: ["$transactionType", 2] }, "$amount", 0] },
+          },
+        },
+      },
+    ]);
+
+    const totalCredit = walletAgg[0]?.totalCredit || 0;
+    const totalDebit = walletAgg[0]?.totalDebit || 0;
+    const correctNetPayout = totalCredit - totalDebit;
+
+    // Self-healing: Update if mismatch found
+    if (seller.netPayout !== correctNetPayout || seller.amountWithdrawn !== totalDebit) {
+      seller.netPayout = correctNetPayout;
+      seller.amountWithdrawn = totalDebit;
+      await seller.save();
+    }
+
     return res.status(200).json({ status: true, message: "Profile retrieved.", seller });
   } catch (error) {
     console.error(error);
@@ -1135,5 +1164,161 @@ exports.deleteSeller = async (req, res) => {
       status: false,
       message: error.message || "Internal Server Error",
     });
+  }
+};
+
+// Seller Dashboard API
+exports.getDashboard = async (req, res) => {
+  try {
+    const sellerId = req.user.id;
+    if (!sellerId) return res.status(400).json({ status: false, message: "Seller ID is required" });
+
+    // Time ranges (Using local server time which is likely IST or UTC, assuming consistent usage)
+    const now = new Date();
+
+    // Start of Day
+    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+    // Start of Month
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+    // Start of Year
+    const startOfYear = new Date(now.getFullYear(), 0, 1);
+
+    const [productCount, orderStats] = await Promise.all([
+      Product.countDocuments({ seller: sellerId, isDeleted: { $ne: true } }),
+      Order.aggregate([
+        { $unwind: "$items" },
+        {
+          $match: {
+            "items.sellerId": new mongoose.Types.ObjectId(sellerId)
+          }
+        },
+        {
+          $project: {
+            createdAt: 1,
+            status: "$items.status",
+            quantity: "$items.productQuantity",
+            amount: {
+              $subtract: [
+                {
+                  $add: [
+                    { $multiply: [{ $ifNull: ["$items.purchasedTimeProductPrice", 0] }, { $ifNull: ["$items.productQuantity", 0] }] },
+                    { $ifNull: ["$items.purchasedTimeShippingCharges", 0] }
+                  ]
+                },
+                {
+                  $add: [
+                    { $ifNull: ["$items.itemDiscount", 0] },
+                    { $ifNull: ["$items.commissionPerProductQuantity", 0] }
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        {
+          $facet: {
+            allTime: [
+              {
+                $group: {
+                  _id: null,
+                  totalOrder: { $sum: 1 },
+                  totalPendingOrder: {
+                    $sum: { $cond: [{ $in: ["$status", ["Pending", "Confirmed", "Out For Delivery", "Manual Auction Pending Payment", "Auction Pending Payment"]] }, 1, 0] }
+                  },
+                  totalDeclinedOrder: {
+                    $sum: { $cond: [{ $in: ["$status", ["Cancelled", "Manual Auction Cancelled", "Auction Cancelled"]] }, 1, 0] }
+                  },
+                  totalCompleteOrder: {
+                    $sum: { $cond: [{ $eq: ["$status", "Delivered"] }, 1, 0] }
+                  },
+                  totalEarning: { $sum: "$amount" },
+                  totalProductSale: { $sum: "$quantity" }
+                }
+              }
+            ],
+            today: [
+              { $match: { createdAt: { $gte: startOfDay } } },
+              {
+                $group: {
+                  _id: null,
+                  todayOrder: { $sum: 1 },
+                  todayPendingOrder: {
+                    $sum: { $cond: [{ $in: ["$status", ["Pending", "Confirmed", "Out For Delivery", "Manual Auction Pending Payment", "Auction Pending Payment"]] }, 1, 0] }
+                  },
+                  todayEarning: { $sum: "$amount" },
+                  todayPendingEarning: {
+                    $sum: { $cond: [{ $in: ["$status", ["Pending", "Confirmed", "Out For Delivery", "Manual Auction Pending Payment", "Auction Pending Payment"]] }, "$amount", 0] }
+                  },
+                  todayProductSale: { $sum: "$quantity" }
+                }
+              }
+            ],
+            month: [
+              { $match: { createdAt: { $gte: startOfMonth } } },
+              {
+                $group: {
+                  _id: null,
+                  monthEarning: { $sum: "$amount" },
+                  monthProductSale: { $sum: "$quantity" }
+                }
+              }
+            ],
+            year: [
+              { $match: { createdAt: { $gte: startOfYear } } },
+              {
+                $group: {
+                  _id: null,
+                  yearEarning: { $sum: "$amount" },
+                  yearProductSale: { $sum: "$quantity" }
+                }
+              }
+            ]
+          }
+        }
+      ])
+    ]);
+
+    const stats = orderStats[0];
+    const allTime = stats.allTime[0] || {};
+    const today = stats.today[0] || {};
+    const month = stats.month[0] || {};
+    const year = stats.year[0] || {};
+
+    return res.status(200).json({
+      status: true,
+      message: "Dashboard data retrieved successfully",
+      dashboard: {
+        totalProduct: productCount || 0,
+
+        // Today Stats
+        todayOrder: today.todayOrder || 0,
+        todayPendingOrder: today.todayPendingOrder || 0,
+        todayEarning: parseFloat(today.todayEarning || 0).toFixed(2),
+        todayPendingEarning: parseFloat(today.todayPendingEarning || 0).toFixed(2),
+        todayProductSale: today.todayProductSale || 0,
+
+        // Month Stats
+        monthEarning: parseFloat(month.monthEarning || 0).toFixed(2),
+        monthProductSale: month.monthProductSale || 0,
+
+        // Year Stats
+        yearEarning: parseFloat(year.yearEarning || 0).toFixed(2),
+        yearProductSale: year.yearProductSale || 0,
+
+        // Total Stats
+        totalOrder: allTime.totalOrder || 0,
+        totalPendingOrder: allTime.totalPendingOrder || 0,
+        totalDeclinedOrder: allTime.totalDeclinedOrder || 0,
+        totalCompleteOrder: allTime.totalCompleteOrder || 0,
+        totalEarning: parseFloat(allTime.totalEarning || 0).toFixed(2),
+        totalProductSale: allTime.totalProductSale || 0
+      }
+    });
+
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ status: false, message: error.message || "Internal Server Error" });
   }
 };

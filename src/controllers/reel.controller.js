@@ -821,3 +821,38 @@ exports.deleteReel = async (req, res) => {
     });
   }
 };
+
+// Increment view count
+exports.addView = async (req, res) => {
+  try {
+    const { reelId } = req.body;
+
+    if (!reelId) {
+      return res.status(400).json({ status: false, message: "Reel ID is required" });
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(reelId)) {
+      return res.status(400).json({ status: false, message: "Invalid Reel ID" });
+    }
+
+    const reel = await Reel.findByIdAndUpdate(
+      reelId,
+      { $inc: { view: 1 } },
+      { new: true }
+    );
+
+    if (!reel) {
+      return res.status(404).json({ status: false, message: get_message(1141) });
+    }
+
+    return res.status(200).json({
+      status: true,
+      message: "Reel view count updated successfully",
+      view: reel.view
+    });
+
+  } catch (error) {
+    console.error("addView error:", error);
+    return res.status(500).json({ status: false, message: error.message || "Internal Server Error" });
+  }
+};

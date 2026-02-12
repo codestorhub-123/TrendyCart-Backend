@@ -497,6 +497,28 @@ exports.detail = async (req, res) => {
         },
       },
 
+      // 🔹 Lookup Reel
+      {
+        $lookup: {
+          from: "reels",
+          localField: "_id",
+          foreignField: "productId",
+          pipeline: [
+            { $match: { isFake: false } }, // Optional: Filter only real reels or active ones? sticking to basic relation
+            { $project: { video: 1, thumbnail: 1 ,view: 1} },
+            { $limit: 1 }
+          ],
+          as: "reelData",
+        },
+      },
+      {
+        $addFields: {
+          reelVideo: { $arrayElemAt: ["$reelData.video", 0] },
+          reelThumbnail: { $arrayElemAt: ["$reelData.thumbnail", 0] },
+          view: { $arrayElemAt: ["$reelData.view", 0] },
+        },
+      },
+
       // 🔹 Final projection (unchanged)
       {
         $project: {
@@ -544,6 +566,9 @@ exports.detail = async (req, res) => {
           },
           isFollow: 1,
           isFavorite: { $gt: [{ $size: "$isFavorite" }, 0] },
+          reelVideo: 1,
+          reelThumbnail: 1,
+          view:1 
         },
       },
     ]);

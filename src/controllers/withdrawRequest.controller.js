@@ -78,6 +78,10 @@ exports.initiateCashOut = async (req, res) => {
             await WithDrawRequest.deleteOne({ _id: declinedRequest._id });
         }
 
+        const trimmedPaymentGateway = paymentGateway.trim();
+        const formattedDetails = paymentDetails;
+        const uniqueId = generateHistoryUniqueId();
+
         await Promise.all([
             WithDrawRequest.create({
                 sellerId: sellerObjectId,
@@ -270,28 +274,33 @@ exports.approveWithdrawalRequest = async (req, res) => {
             return res.status(400).json({ status: false, message: get_message(1178) });
         }
 
-        const updates = [];
+        // 2. Sequential Update to prevent partial failures
+        // First, attempt to deduct from Seller (Atomic check & set)
+        const sellerUpdate = await Seller.updateOne(
+            { _id: sellerAccount._id, netPayout: { $gte: request.amount } },
+            {
+                $inc: {
+                    netPayout: -request.amount,
+                    amountWithdrawn: request.amount,
+                },
+            }
+        );
 
-        updates.push(
-            Seller.updateOne(
-                { _id: sellerAccount._id, netPayout: { $gte: request.amount } },
-                {
-                    $inc: {
-                        netPayout: -request.amount,
-                        amountWithdrawn: request.amount,
-                    },
-                }
-            ),
-            SellerWallet.create({
+        if (sellerUpdate.modifiedCount === 0) {
+            // This happens if netPayout became insufficient in the split second between the read and now
+            return res.status(400).json({ status: false, message: get_message(1178) });
+        }
+
+        // Only proceed if Seller was successfully updated
+        try {
+            await SellerWallet.create({
                 transactionType: 2,
                 sellerId: sellerAccount._id,
                 amount: request.amount,
                 date: new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }),
-            })
-        );
+            });
 
-        updates.push(
-            WithDrawRequest.updateOne(
+            await WithDrawRequest.updateOne(
                 { _id: request._id },
                 {
                     $set: {
@@ -299,11 +308,22 @@ exports.approveWithdrawalRequest = async (req, res) => {
                         acceptOrDeclineDate: new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }),
                     },
                 }
-            )
-        );
+            );
 
-        const results = await Promise.all(updates);
-        console.log("APPROVE DEBUG - Results:", JSON.stringify(results, null, 2));
+        } catch (txnError) {
+            // CRITICAL: If Wallet/Request update fails, we should ideally rollback Seller update
+            // manual rollback attempt:
+            await Seller.updateOne(
+                { _id: sellerAccount._id },
+                {
+                    $inc: {
+                        netPayout: request.amount,
+                        amountWithdrawn: -request.amount,
+                    },
+                }
+            );
+            throw txnError;
+        }
 
         res.status(200).json({
             status: true,

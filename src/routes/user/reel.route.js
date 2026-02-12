@@ -173,4 +173,29 @@ route.delete("/deleteReel", controller.deleteReel);
  * */
 route.get("/detailsOfReel", controller.detailsOfReel);
 
+/**
+ * @swagger
+ * /user/reel/addView:
+ *   post:
+ *     summary: Increment reel view count
+ *     tags: [Reel]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - reelId
+ *             properties:
+ *               reelId:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: View count updated successfully
+ */
+route.post("/addView", controller.addView);
+
 module.exports = route;

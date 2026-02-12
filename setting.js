@@ -20,11 +20,11 @@ module.exports = {
   },
   "_id": "673eaea4529c5f0fedc97bec",
   "privacyPolicyLink": "<P>PRIVACY POLICY LINK</P>",
-  "privacyPolicyText": "<h2 style=\"text-align: center;\"><strong>Privacy Policy</strong></h2><p>We respect your privacy and are committed to protecting your personal information. This Privacy Policy explains how we collect, use, and safeguard your data.</p><h3><strong>Information We Collect</strong></h3><p>We may collect personal details such as your name, email address, phone number, and usage data when you use our services.</p><h3><strong>How We Use Your Information</strong></h3><p>Your information is used to provide and improve our services, communicate with you, ensure security, and comply with legal requirements.</p><h3><strong>Data Sharing</strong></h3><p>We do not sell or rent your personal data. Information may be shared only with trusted third parties when required to operate our services or by law.</p><h3><strong>Data Security</strong></h3><p>We implement appropriate security measures to protect your information from unauthorized access, loss, or misuse.</p><h3><strong>Your Rights</strong></h3><p>You have the right to access, update, or delete your personal information by contacting us.</p><h3><strong>Changes to This Policy</strong></h3><p>We may update this Privacy Policy from time to time. Any changes will be posted here.</p><h3><strong>Contact Us</strong></h3><p>If you have any questions about this Privacy Policy, please contact us.</p>",
+  "privacyPolicyText": "<h2 style=\"text-align: center;\">Privacy Policy</h2><p style=\"text-align: left;\">We respect your privacy and are committed to protecting your personal information. This Privacy Policy explains how we collect, use, and safeguard your data.</p><h3>Information We Collect</h3><p>We may collect personal details such as your name, email address, phone number, and usage data when you use our services.</p><h3>How We Use Your Information</h3><p>Your information is used to provide and improve our services, communicate with you, ensure security, and comply with legal requirements.</p><h3>Data Sharing</h3><p>We do not sell or rent your personal data. Information may be shared only with trusted third parties when required to operate our services or as required by law.</p><h3>Data Security</h3><p>We implement appropriate security measures to protect your information from unauthorized access, loss, or misuse.</p><h3>Your Rights</h3><p>You have the right to access, update, or delete your personal information by contacting us.</p><h3>Changes to This Policy</h3><p>We may update this Privacy Policy from time to time. Any changes will be posted on this page.</p><h3>Contact Us</h3><p>If you have any questions about this Privacy Policy, please contact us.</p>",
   "withdrawCharges": 10,
   "withdrawLimit": 1000,
   "createdAt": "2023-04-12T04:45:27.628Z",
-  "updatedAt": "2026-02-11T10:38:24.088Z",
+  "updatedAt": "2026-02-12T12:16:40.555Z",
   "cancelOrderCharges": 20,
   "paymentGateway": [
     {
@@ -34,7 +34,7 @@ module.exports = {
       "name": "phonePe"
     }
   ],
-  "adminCommissionCharges": 50,
+  "adminCommissionCharges": 10,
   "isAddProductRequest": true,
   "razorPayId": "Razor Pay Id",
   "razorPaySwitch": true,
@@ -62,12 +62,12 @@ module.exports = {
   "flutterWaveId": "FLWPUBK_TEST-94c5f470ca54b0ecaca6e2b4f0985a55-X",
   "flutterWaveSwitch": true,
   "isCashOnDelivery": false,
-  "minPayout": 0,
+  "minPayout": 1000,
   "openaiApiKey": "",
   "paymentReminderForLiveAuction": 0,
   "paymentReminderForManualAuction": 0,
   "resendApiKey": "RESEND API KEY",
   "termsAndConditionsLink": "<P>TERMS & CONDITION LINK</P>",
-  "termsAndConditionsText": "TERMS AND CONDITION TEXT",
+  "termsAndConditionsText": "<h2 style=\"text-align: center;\">Terms &amp; Conditions</h2><p style=\"text-align: left;\">By accessing or using this website or application, you agree to comply with the following terms.</p><p>You may browse products without creating an account. However, placing an order requires providing accurate and complete information. You are responsible for maintaining the confidentiality of your account details.</p><p>All product descriptions, images, and prices are provided for general information only. While we strive for accuracy, errors may occur, and we reserve the right to correct them or cancel orders if necessary.</p><p>Orders are subject to availability and confirmation. Payments must be completed using the payment methods provided on the platform. Shipping timelines are estimates and may vary due to location or external factors.</p><p>Returns and refunds are handled according to our return policy. Items must be returned in original condition to be eligible for a refund or replacement.</p><p>Wishlist items saved without login are stored locally on your device and may be removed if browser data is cleared.</p><p>All content on this platform, including images, text, and logos, is protected by intellectual property laws and may not be used without permission.</p><p>We reserve the right to suspend or terminate access to the platform in case of misuse, fraudulent activity, or violation of these terms.</p><p>These Terms &amp; Conditions may be updated from time to time. Continued use of the platform indicates acceptance of any changes.</p>",
   "termsConditionText": "<h2 style=\"text-align: center;\">Terms &amp; Conditions</h2><p style=\"text-align: left;\">By accessing or using this website or application, you agree to comply with the following terms.</p><p>You may browse products without creating an account. However, placing an order requires providing accurate and complete information. You are responsible for maintaining the confidentiality of your account details.</p><p>All product descriptions, images, and prices are provided for general information only. While we strive for accuracy, errors may occur, and we reserve the right to correct them or cancel orders if necessary.</p><p>Orders are subject to availability and confirmation. Payments must be completed using the payment methods provided on the platform. Shipping timelines are estimates and may vary due to location or external factors.</p><p>Returns and refunds are handled according to our return policy. Items must be returned in original condition to be eligible for a refund or replacement.</p><p>Wishlist items saved without login are stored locally on your device and may be removed if browser data is cleared.</p><p>All content on this platform, including images, text, and logos, is protected by intellectual property laws and may not be used without permission.</p><p>We reserve the right to suspend or terminate access to the platform in case of misuse, fraudulent activity, or violation of these terms.</p><p>These Terms &amp; Conditions may be updated from time to time. Continued use of the platform indicates acceptance of any changes.</p>"
 };
