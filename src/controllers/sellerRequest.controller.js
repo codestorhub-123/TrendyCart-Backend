@@ -65,7 +65,7 @@ exports.updateRequest = async (req, res) => {
         if (req.body.businessName !== undefined) request.businessName = req.body.businessName;
         if (req.body.businessTag !== undefined) request.businessTag = req.body.businessTag;
 
-        //Update the seller's address fields
+        //Update the seller's address fields add
         if (req.body.address !== undefined) request.address.address = req.body.address;
         if (req.body.landMark !== undefined) request.address.landMark = req.body.landMark;
         if (req.body.city !== undefined) request.address.city = req.body.city;
