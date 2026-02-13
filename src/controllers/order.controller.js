@@ -1162,7 +1162,7 @@ exports.recentOrders = async (req, res) => {
         const orders = await Order.find()
             .sort({ createdAt: -1 })
             .limit(limit)
-            .select("userId items createdAt orderId paymentGateway")
+            .select("userId items createdAt orderId paymentGateway finalTotal")
             .populate("userId", "firstName lastName profileImage")
             .populate("items.productId", "productName mainImage _id")
             .populate("items.sellerId", "businessName")

@@ -26,7 +26,7 @@ exports.dashboard = async (req, res) => {
       Seller.countDocuments({ isLive: true }),
       SellerWallet.aggregate([
         //{ $match: dateFilterQuery },
-        { $group: { _id: null, totalCommission: { $sum: "$commissionPerUnit" } } },
+        { $group: { _id: null, totalCommission: { $sum: "$commissionPerProductQuantity" } } },
       ]).then((result) => (result.length > 0 ? result[0].totalCommission : 0)),
     ]);
 
@@ -307,7 +307,7 @@ exports.revenueAnalyticsChartData = async (req, res) => {
         {
           $group: {
             _id: { $dateToString: { format: "%d-%m-%Y", date: "$createdAt" } },
-            totalCommission: { $sum: "$commissionPerUnit" },
+            totalCommission: { $sum: "$commissionPerProductQuantity" },
           },
         },
         {
@@ -321,7 +321,7 @@ exports.revenueAnalyticsChartData = async (req, res) => {
         {
           $group: {
             _id: { $dateToString: { format: "%d-%m-%Y", date: "$createdAt" } },
-            totalEarningWithCommission: { $sum: { $sum: ["$totalAmount", "$commissionPerUnit"] } },
+            totalEarningWithCommission: { $sum: { $sum: ["$amount", "$commissionPerProductQuantity"] } },
           },
         },
         {
@@ -335,7 +335,7 @@ exports.revenueAnalyticsChartData = async (req, res) => {
         {
           $group: {
             _id: { $dateToString: { format: "%d-%m-%Y", date: "$createdAt" } },
-            totalEarningWithoutCommission: { $sum: "$totalAmount" },
+            totalEarningWithoutCommission: { $sum: "$amount" },
           },
         },
         {
