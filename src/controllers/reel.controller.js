@@ -106,6 +106,7 @@ exports.getReelsForUser = async (req, res) => {
           productId: 1,
           sellerId: 1,
           like: 1,
+          view: 1,
           description: 1,
           createdAt: 1,
           isLike: { $gt: [{ $size: "$likeData" }, 0] },
