@@ -99,10 +99,18 @@ exports.getSellerFollowers = async (req, res) => {
         }
 
         const sellerId = new mongoose.Types.ObjectId(req.query.sellerId);
+        const page = Math.max(1, parseInt(req.query.page) || 1);
+        const limit = Math.max(1, parseInt(req.query.limit) || 10);
+        const skip = (page - 1) * limit;
 
-        const [seller, rawFollowerList] = await Promise.all([
+        const [seller, totalCount, rawFollowerList] = await Promise.all([
             Seller.findOne({ _id: sellerId }).select("_id isBlock").lean(),
-            Follower.find({ sellerId: sellerId }).populate("userId", "_id firstName lastName image").sort({ createdAt: -1 }),
+            Follower.countDocuments({ sellerId: sellerId }),
+            Follower.find({ sellerId: sellerId })
+                .populate("userId", "_id firstName lastName image")
+                .sort({ createdAt: -1 })
+                .skip(skip)
+                .limit(limit),
         ]);
 
         const followerList = rawFollowerList.filter(item => item.userId !== null);
@@ -118,6 +126,10 @@ exports.getSellerFollowers = async (req, res) => {
         return res.status(200).json({
             status: true,
             message: "Seller followers retrieved successfully.",
+            total: totalCount,
+            totalPages: Math.ceil(totalCount / limit),
+            currentPage: page,
+            limit: limit,
             followerList,
         });
     } catch (error) {

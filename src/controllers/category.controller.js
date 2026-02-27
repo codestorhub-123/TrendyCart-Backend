@@ -228,6 +228,10 @@ exports.delete = async (req, res) => {
 
 exports.getCategory = async (req, res) => {
   try {
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.max(1, parseInt(req.query.limit) || 10);
+    const skip = (page - 1) * limit;
+
     const category = await Category.aggregate([
       {
         $lookup: {
@@ -256,12 +260,28 @@ exports.getCategory = async (req, res) => {
         },
       },
       { $sort: { createdAt: -1 } },
+      {
+        $facet: {
+          metadata: [{ $count: "total" }],
+          data: [
+            { $skip: skip },
+            { $limit: limit },
+          ],
+        },
+      },
     ]);
+
+    const totalCount = category[0].metadata[0]?.total || 0;
+    const data = category[0].data;
 
     return res.status(200).json({
       status: true,
       message: get_message(1090),
-      category,
+      total: totalCount,
+      totalPages: Math.ceil(totalCount / limit),
+      currentPage: page,
+      limit: limit,
+      category: data,
     });
   } catch (error) {
     console.log(error);

@@ -216,6 +216,10 @@ exports.updateProductRequestStatusWise = async (req, res) => {
             return res.status(400).json({ status: true, message: get_message(1121) });
         }
 
+        const page = Math.max(1, parseInt(req.query.page) || 1);
+        const limit = Math.max(1, parseInt(req.query.limit) || 20);
+        const skip = (page - 1) * limit;
+
         let statusQuery = {};
         if (req.query.status === "Pending") {
             statusQuery = { updateStatus: "Pending" };
@@ -233,11 +237,18 @@ exports.updateProductRequestStatusWise = async (req, res) => {
             return res.status(400).json({ status: false, message: get_message(1121) });
         }
 
-        const productRequests = await ProductRequest.find(statusQuery);
+        const [totalCount, productRequests] = await Promise.all([
+            ProductRequest.countDocuments(statusQuery),
+            ProductRequest.find(statusQuery).sort({ createdAt: -1 }).skip(skip).limit(limit)
+        ]);
 
         return res.status(200).json({
             status: true,
             message: `Retrive product's request to update the product with status ${req.query.status}`,
+            total: totalCount,
+            totalPages: Math.ceil(totalCount / limit),
+            currentPage: page,
+            limit: limit,
             productRequests,
         });
     } catch (error) {
@@ -473,6 +484,10 @@ exports.createProductRequestStatusWise = async (req, res) => {
             return res.status(400).json({ status: true, message: get_message(1074) });
         }
 
+        const page = Math.max(1, parseInt(req.query.page) || 1);
+        const limit = Math.max(1, parseInt(req.query.limit) || 20);
+        const skip = (page - 1) * limit;
+
         let statusQuery = {};
         if (req.query.status === "Pending") {
             statusQuery = { createStatus: "Pending" };
@@ -490,11 +505,18 @@ exports.createProductRequestStatusWise = async (req, res) => {
             return res.status(400).json({ status: false, message: get_message(1121) });
         }
 
-        const products = await Product.find(statusQuery);
+        const [totalCount, products] = await Promise.all([
+            Product.countDocuments(statusQuery),
+            Product.find(statusQuery).sort({ createdAt: -1 }).skip(skip).limit(limit)
+        ]);
 
         return res.status(200).json({
             status: true,
             message: `Retrive products with status ${req.query.status}`,
+            total: totalCount,
+            totalPages: Math.ceil(totalCount / limit),
+            currentPage: page,
+            limit: limit,
             products,
         });
     } catch (error) {

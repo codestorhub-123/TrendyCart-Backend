@@ -53,14 +53,27 @@ exports.list = async (req, res) => {
     }
 
     /* ===================== FETCH NOTIFICATIONS ===================== */
-    const notification = await Notification.find(query)
-      .sort({ createdAt: -1 })
-      .lean();
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.max(1, parseInt(req.query.limit) || 20);
+    const skip = (page - 1) * limit;
+
+    const [totalNotifications, notification] = await Promise.all([
+      Notification.countDocuments(query),
+      Notification.find(query)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean()
+    ]);
 
     /* ===================== RESPONSE ===================== */
     return res.status(200).json({
       status: true,
       message: `Retrieved the notification list for the ${role}!`,
+      total: totalNotifications,
+      totalPages: Math.ceil(totalNotifications / limit),
+      currentPage: page,
+      limit: limit,
       notification
     });
 

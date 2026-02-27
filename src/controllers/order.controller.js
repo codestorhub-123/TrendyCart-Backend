@@ -424,6 +424,10 @@ exports.orderDetailsForUser = async (req, res) => {
         const status = queryStatus ? decodeURIComponent(queryStatus) : null;
         let userId;
 
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 10;
+        const skip = (page - 1) * limit;
+
         if (req.query.userId) {
             userId = req.query.userId;
         } else if (req.user && (req.user._id || req.user.id)) {
@@ -477,180 +481,193 @@ exports.orderDetailsForUser = async (req, res) => {
 
         const now = new Date();
 
-        const orders = await Order.aggregate([
-            {
-                $match: {
-                    userId: userObjectId,
-                    ...matchStatus,
+        const [orders, totalOrdersResult] = await Promise.all([
+            Order.aggregate([
+                {
+                    $match: {
+                        userId: userObjectId,
+                        ...matchStatus,
+                    },
                 },
-            },
-            {
-                $project: {
-                    userId: 1,
-                    orderId: 1,
-                    finalTotal: 1,
-                    paymentStatus: 1,
-                    paymentGateway: 1,
-                    promoCode: 1,
-                    shippingAddress: 1,
-                    createdAt: { $dateToString: { format: "%d/%m/%Y", date: "$createdAt", timezone: "Asia/Kolkata" } }, // Format date
-                    manualAuctionPaymentReminderDuration: 1,
-                    liveAuctionPaymentReminderDuration: 1,
-                    items: {
-                        $filter: {
-                            input: "$items",
-                            as: "item",
-                            cond: status === "All" ? { $in: ["$$item.status", allowedStatuses] } : { $eq: ["$$item.status", status] },
+                { $sort: { createdAt: -1 } },
+                { $skip: skip },
+                { $limit: limit },
+                {
+                    $project: {
+                        userId: 1,
+                        orderId: 1,
+                        finalTotal: 1,
+                        paymentStatus: 1,
+                        paymentGateway: 1,
+                        promoCode: 1,
+                        shippingAddress: 1,
+                        createdAt: { $dateToString: { format: "%d/%m/%Y", date: "$createdAt", timezone: "Asia/Kolkata" } }, // Format date
+                        manualAuctionPaymentReminderDuration: 1,
+                        liveAuctionPaymentReminderDuration: 1,
+                        items: {
+                            $filter: {
+                                input: "$items",
+                                as: "item",
+                                cond: status === "All" ? { $in: ["$$item.status", allowedStatuses] } : { $eq: ["$$item.status", status] },
+                            },
                         },
                     },
                 },
-            },
-            {
-                $addFields: {
-                    items: {
-                        $map: {
-                            input: "$items",
-                            as: "item",
-                            in: {
-                                $mergeObjects: [
-                                    "$$item",
-                                    {
-                                        paymentTimeRemaining: {
-                                            $switch: {
-                                                branches: [
-                                                    {
-                                                        case: { $eq: ["$$item.status", "Manual Auction Pending Payment"] },
-                                                        then: {
-                                                            $max: [
-                                                                0,
-                                                                {
-                                                                    $subtract: [
-                                                                        { $multiply: ["$manualAuctionPaymentReminderDuration", 60] },
-                                                                        { $floor: { $divide: [{ $subtract: [now, "$createdAt"] }, 1000] } },
-                                                                    ],
-                                                                },
-                                                            ],
+                {
+                    $addFields: {
+                        items: {
+                            $map: {
+                                input: "$items",
+                                as: "item",
+                                in: {
+                                    $mergeObjects: [
+                                        "$$item",
+                                        {
+                                            paymentTimeRemaining: {
+                                                $switch: {
+                                                    branches: [
+                                                        {
+                                                            case: { $eq: ["$$item.status", "Manual Auction Pending Payment"] },
+                                                            then: {
+                                                                $max: [
+                                                                    0,
+                                                                    {
+                                                                        $subtract: [
+                                                                            { $multiply: ["$manualAuctionPaymentReminderDuration", 60] },
+                                                                            { $floor: { $divide: [{ $subtract: [now, "$createdAt"] }, 1000] } },
+                                                                        ],
+                                                                    },
+                                                                ],
+                                                            },
                                                         },
-                                                    },
-                                                    {
-                                                        case: { $eq: ["$$item.status", "Auction Pending Payment"] },
-                                                        then: {
-                                                            $max: [
-                                                                0,
-                                                                {
-                                                                    $subtract: [
-                                                                        { $multiply: ["$liveAuctionPaymentReminderDuration", 60] },
-                                                                        { $floor: { $divide: [{ $subtract: [now, "$createdAt"] }, 1000] } },
-                                                                    ],
-                                                                },
-                                                            ],
+                                                        {
+                                                            case: { $eq: ["$$item.status", "Auction Pending Payment"] },
+                                                            then: {
+                                                                $max: [
+                                                                    0,
+                                                                    {
+                                                                        $subtract: [
+                                                                            { $multiply: ["$liveAuctionPaymentReminderDuration", 60] },
+                                                                            { $floor: { $divide: [{ $subtract: [now, "$createdAt"] }, 1000] } },
+                                                                        ],
+                                                                    },
+                                                                ],
+                                                            },
                                                         },
-                                                    },
-                                                ],
-                                                default: "$$REMOVE",
+                                                    ],
+                                                    default: "$$REMOVE",
+                                                },
                                             },
+                                            date: { $dateToString: { format: "%d/%m/%Y", date: "$$item.createdAt", timezone: "Asia/Kolkata" } }
                                         },
-                                        date: { $dateToString: { format: "%d/%m/%Y", date: "$$item.createdAt", timezone: "Asia/Kolkata" } }
-                                    },
-                                ],
+                                    ],
+                                },
                             },
                         },
                     },
                 },
-            },
-            { $unwind: "$items" },
-            {
-                $addFields: {
-                    "items.productId": {
-                        $cond: {
-                            if: { $eq: [{ $type: "$items.productId" }, "string"] },
-                            then: { $toObjectId: "$items.productId" },
-                            else: "$items.productId",
+                { $unwind: "$items" },
+                {
+                    $addFields: {
+                        "items.productId": {
+                            $cond: {
+                                if: { $eq: [{ $type: "$items.productId" }, "string"] },
+                                then: { $toObjectId: "$items.productId" },
+                                else: "$items.productId",
+                            },
                         },
                     },
                 },
-            },
-            {
-                $lookup: {
-                    from: "products",
-                    localField: "items.productId",
-                    foreignField: "_id",
-                    as: "productData",
-                },
-            },
-            {
-                $addFields: {
-                    "items.productId": {
-                        $arrayElemAt: [
-                            {
-                                $map: {
-                                    input: "$productData",
-                                    as: "prod",
-                                    in: {
-                                        _id: "$$prod._id",
-                                        productName: "$$prod.productName",
-                                        mainImage: "$$prod.mainImage",
-                                    },
-                                },
-                            },
-                            0,
-                        ],
+                {
+                    $lookup: {
+                        from: "products",
+                        localField: "items.productId",
+                        foreignField: "_id",
+                        as: "productData",
                     },
                 },
-            },
-            { $project: { productData: 0 } },
-            {
-                $group: {
-                    _id: "$_id",
-                    userId: { $first: "$userId" },
-                    orderId: { $first: "$orderId" },
-                    finalTotal: { $first: "$finalTotal" },
-                    paymentStatus: { $first: "$paymentStatus" },
-                    paymentGateway: { $first: "$paymentGateway" },
-                    promoCode: { $first: "$promoCode" },
-                    shippingAddress: { $first: "$shippingAddress" },
-                    createdAt: { $first: "$createdAt" },
-                    manualAuctionPaymentReminderDuration: { $first: "$manualAuctionPaymentReminderDuration" },
-                    liveAuctionPaymentReminderDuration: { $first: "$liveAuctionPaymentReminderDuration" },
-                    items: { $push: "$items" },
-                },
-            },
-            {
-                $lookup: {
-                    from: "users",
-                    localField: "userId",
-                    foreignField: "_id",
-                    as: "userData",
-                },
-            },
-            {
-                $addFields: {
-                    userId: {
-                        $arrayElemAt: [
-                            {
-                                $map: {
-                                    input: "$userData",
-                                    as: "u",
-                                    in: {
-                                        _id: "$$u._id",
-                                        firstName: "$$u.firstName",
-                                        lastName: "$$u.lastName",
-                                        mobileNumber: "$$u.mobileNumber",
+                {
+                    $addFields: {
+                        "items.productId": {
+                            $arrayElemAt: [
+                                {
+                                    $map: {
+                                        input: "$productData",
+                                        as: "prod",
+                                        in: {
+                                            _id: "$$prod._id",
+                                            productName: "$$prod.productName",
+                                            mainImage: "$$prod.mainImage",
+                                        },
                                     },
                                 },
-                            },
-                            0,
-                        ],
+                                0,
+                            ],
+                        },
                     },
                 },
-            },
-            { $project: { userData: 0 } },
-            { $sort: { createdAt: -1 } },
+                { $project: { productData: 0 } },
+                {
+                    $group: {
+                        _id: "$_id",
+                        userId: { $first: "$userId" },
+                        orderId: { $first: "$orderId" },
+                        finalTotal: { $first: "$finalTotal" },
+                        paymentStatus: { $first: "$paymentStatus" },
+                        paymentGateway: { $first: "$paymentGateway" },
+                        promoCode: { $first: "$promoCode" },
+                        shippingAddress: { $first: "$shippingAddress" },
+                        createdAt: { $first: "$createdAt" },
+                        manualAuctionPaymentReminderDuration: { $first: "$manualAuctionPaymentReminderDuration" },
+                        liveAuctionPaymentReminderDuration: { $first: "$liveAuctionPaymentReminderDuration" },
+                        items: { $push: "$items" },
+                    },
+                },
+                {
+                    $lookup: {
+                        from: "users",
+                        localField: "userId",
+                        foreignField: "_id",
+                        as: "userData",
+                    },
+                },
+                {
+                    $addFields: {
+                        userId: {
+                            $arrayElemAt: [
+                                {
+                                    $map: {
+                                        input: "$userData",
+                                        as: "u",
+                                        in: {
+                                            _id: "$$u._id",
+                                            firstName: "$$u.firstName",
+                                            lastName: "$$u.lastName",
+                                            mobileNumber: "$$u.mobileNumber",
+                                        },
+                                    },
+                                },
+                                0,
+                            ],
+                        },
+                    },
+                },
+                { $project: { userData: 0 } },
+                { $sort: { createdAt: -1 } },
+            ]),
+            Order.countDocuments({
+                userId: userObjectId,
+                ...matchStatus,
+            })
         ]);
 
         return res.status(200).json({
             status: true,
             message: `Retrieved Order History for User with status ${status}`,
+            total: totalOrdersResult,
+            totalPages: Math.ceil(totalOrdersResult / limit),
+            currentPage: page,
+            limit: limit,
             orderData: orders,
         });
     } catch (error) {

@@ -505,7 +505,7 @@ exports.detail = async (req, res) => {
           foreignField: "productId",
           pipeline: [
             { $match: { isFake: false } }, // Optional: Filter only real reels or active ones? sticking to basic relation
-            { $project: { video: 1, thumbnail: 1 ,view: 1} },
+            { $project: { video: 1, thumbnail: 1, view: 1 } },
             { $limit: 1 }
           ],
           as: "reelData",
@@ -568,7 +568,7 @@ exports.detail = async (req, res) => {
           isFavorite: { $gt: [{ $size: "$isFavorite" }, 0] },
           reelVideo: 1,
           reelThumbnail: 1,
-          view:1 
+          view: 1
         },
       },
     ]);
@@ -951,6 +951,9 @@ exports.geAllNewCollection = async (req, res) => {
 exports.justForYouProducts = async (req, res) => {
   try {
     const userId = (req.user && req.user.id) ? new mongoose.Types.ObjectId(req.user.id) : null;
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.max(1, parseInt(req.query.limit) || 10);
+    const skip = (page - 1) * limit;
 
     // 1️⃣ Validate user - skip for guest
     if (userId) {
@@ -970,11 +973,12 @@ exports.justForYouProducts = async (req, res) => {
     const favoriteCategoryIds = favorites.map(f => f.categoryId);
 
     // 3️⃣ Personalized aggregation
-    const justForYouProducts = await Product.aggregate([
+    const justForYouResults = await Product.aggregate([
       {
         $match: {
           createStatus: "Approved",
           isOutOfStock: false,
+          isDeleted: { $ne: true }
         },
       },
 
@@ -1036,31 +1040,45 @@ exports.justForYouProducts = async (req, res) => {
         },
       },
 
-      { $limit: 10 },
-
-      // 🔹 Final response shape
       {
-        $project: {
-          seller: 1,
-          mainImage: 1,
-          productName: 1,
-          review: 1,
-          price: 1,
-          sold: 1,
-          attributes: 1,
-          auctionEndDate: 1,
-          productSaleType: 1,
-          createStatus: 1,
-          rating: 1,
-          isFavorite: 1,
+        $facet: {
+          metadata: [{ $count: "total" }],
+          data: [
+            { $skip: skip },
+            { $limit: limit },
+            {
+              $project: {
+                seller: 1,
+                mainImage: 1,
+                productName: 1,
+                review: 1,
+                price: 1,
+                sold: 1,
+                attributes: 1,
+                auctionEndDate: 1,
+                productSaleType: 1,
+                createStatus: 1,
+                rating: 1,
+                isFavorite: 1,
+              },
+            },
+          ],
         },
       },
     ]);
 
+    const result = justForYouResults[0];
+    const totalCount = result.metadata[0]?.total || 0;
+    const productsData = result.data;
+
     return res.status(200).json({
       status: true,
       message: "Retrieve just for you products successful.",
-      justForYouProducts,
+      total: totalCount,
+      totalPages: Math.ceil(totalCount / limit),
+      currentPage: page,
+      limit: limit,
+      justForYouProducts: productsData,
     });
   } catch (error) {
     console.error("justForYouProducts error:", error);
@@ -1127,12 +1145,17 @@ exports.getAuctionProducts = async (req, res) => {
 
 exports.featuredProducts = async (req, res) => {
   try {
-    const popularProducts = await Product.aggregate([
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.max(1, parseInt(req.query.limit) || 10);
+    const skip = (page - 1) * limit;
+
+    const popularProductsResults = await Product.aggregate([
       // 1️⃣ Filter first (uses index)
       {
         $match: {
           isOutOfStock: false,
           createStatus: "Approved",
+          isDeleted: { $ne: true }
         },
       },
 
@@ -1168,47 +1191,53 @@ exports.featuredProducts = async (req, res) => {
         },
       },
 
-      // 4️⃣ SORT EARLY (critical)
+      // 4️⃣ Sort
       {
         $sort: {
           avgRating: -1,
         },
       },
 
-      // 5️⃣ LIMIT EARLY (critical)
-      { $limit: 10 },
-
-      // 6️⃣ Category lookup (only 10 docs now)
       {
-        $lookup: {
-          from: "categories",
-          localField: "category",
-          foreignField: "_id",
-          as: "category",
-        },
-      },
-
-      // 7️⃣ Final projection (REMOVE avgRating)
-      {
-        $project: {
-          mainImage: 1,
-          productName: 1,
-          productCode: 1,
-          description: 1,
-          price: 1,
-          shippingCharges: 1,
-          auctionEndDate: 1,
-          productSaleType: 1,
-          rating: 1, // ✅ rating array only
-          categoryName: { $arrayElemAt: ["$category.name", 0] },
+        $facet: {
+          metadata: [{ $count: "total" }],
+          data: [
+            { $skip: skip },
+            { $limit: limit },
+            {
+              $lookup: {
+                from: "categories",
+                localField: "category",
+                foreignField: "_id",
+                as: "category",
+              },
+            },
+            {
+              $project: {
+                mainImage: 1,
+                productName: 1,
+                productCode: 1,
+                description: 1,
+                price: 1,
+                shippingCharges: 1,
+                auctionEndDate: 1,
+                productSaleType: 1,
+                rating: 1,
+                categoryName: { $arrayElemAt: ["$category.name", 0] },
+              },
+            },
+          ],
         },
       },
     ]);
 
+    const result = popularProductsResults[0];
+    const totalCount = result.metadata[0]?.total || 0;
+    const productsData = result.data;
+
     // 🔹 Sanitize image paths
-    const data = popularProducts.map((p) => {
+    const data = productsData.map((p) => {
       if (p.mainImage) {
-        // Remove base URL if exists and replace backslashes
         let path = p.mainImage.replace(/\\/g, "/");
         if (path.includes("/storage/")) {
           path = "/storage/" + path.split("/storage/")[1];
@@ -1221,6 +1250,10 @@ exports.featuredProducts = async (req, res) => {
     return res.status(200).json({
       status: true,
       message: "Retrieve popular/featured products successful.",
+      total: totalCount,
+      totalPages: Math.ceil(totalCount / limit),
+      currentPage: page,
+      limit: limit,
       data,
     });
   } catch (error) {
@@ -1235,7 +1268,9 @@ exports.featuredProducts = async (req, res) => {
 exports.getRelatedProductsByCategory = async (req, res) => {
   try {
     const { productId, categoryId } = req.query;
-    const limit = parseInt(req.query.limit) || 10;
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.max(1, parseInt(req.query.limit) || 10);
+    const skip = (page - 1) * limit;
 
     if (!productId || !categoryId) {
       return res.status(200).json({
@@ -1258,99 +1293,87 @@ exports.getRelatedProductsByCategory = async (req, res) => {
     const productObjectId = new mongoose.Types.ObjectId(productId);
     const categoryObjectId = new mongoose.Types.ObjectId(categoryId);
 
-    const relatedProducts = await Product.aggregate([
-      // 1️⃣ FILTER (uses index)
-      {
-        $match: {
-          _id: { $ne: productObjectId },
-          category: categoryObjectId,
-          createStatus: "Approved",
-          isOutOfStock: false,
+    const matchQuery = {
+      _id: { $ne: productObjectId },
+      category: categoryObjectId,
+      createStatus: "Approved",
+      isOutOfStock: false,
+      isDeleted: { $ne: true }
+    };
+
+    const [totalCount, relatedProducts] = await Promise.all([
+      Product.countDocuments(matchQuery),
+      Product.aggregate([
+        { $match: matchQuery },
+        { $skip: skip },
+        { $limit: limit },
+        {
+          $project: {
+            productCode: 1,
+            productName: 1,
+            price: 1,
+            shippingCharges: 1,
+            auctionEndDate: 1,
+            mainImage: 1,
+            images: 1,
+            description: 1,
+            seller: 1,
+            productSaleType: 1,
+            category: 1,
+          },
         },
-      },
-
-      // 2️⃣ LIMIT EARLY (BIG performance gain)
-      { $limit: limit },
-
-      // 3️⃣ LIGHT projection early
-      {
-        $project: {
-          productCode: 1,
-          productName: 1,
-          price: 1,
-          shippingCharges: 1,
-          auctionEndDate: 1,
-          mainImage: 1,
-          images: 1,
-          description: 1,
-          seller: 1,
-          productSaleType: 1,
-          category: 1,
-        },
-      },
-
-      // 4️⃣ Rating aggregation (kept consistent)
-      {
-        $lookup: {
-          from: "ratings",
-          let: { pid: "$_id" },
-          pipeline: [
-            {
-              $match: {
-                $expr: { $eq: ["$productId", "$$pid"] },
-              },
-            },
-            {
-              $group: {
-                _id: "$productId",
-                totalUser: { $sum: 1 },
-                avgRating: { $avg: "$rating" },
-              },
-            },
-          ],
-          as: "rating",
-        },
-      },
-
-      // 5️⃣ Favorite check (user-specific)
-      {
-        $lookup: {
-          from: "favorites",
-          let: { pid: "$_id", uid: userId },
-          pipeline: [
-            {
-              $match: {
-                $expr: {
-                  $and: [
-                    { $eq: ["$productId", "$$pid"] },
-                    { $eq: ["$userId", "$$uid"] },
-                  ],
+        {
+          $lookup: {
+            from: "ratings",
+            let: { pid: "$_id" },
+            pipeline: [
+              { $match: { $expr: { $eq: ["$productId", "$$pid"] } } },
+              {
+                $group: {
+                  _id: "$productId",
+                  totalUser: { $sum: 1 },
+                  avgRating: { $avg: "$rating" },
                 },
               },
-            },
-          ],
-          as: "favorite",
+            ],
+            as: "rating",
+          },
         },
-      },
-
-      // 6️⃣ Boolean favorite flag
-      {
-        $addFields: {
-          isFavorite: { $gt: [{ $size: "$favorite" }, 0] },
+        {
+          $lookup: {
+            from: "favorites",
+            let: { pid: "$_id", uid: userId },
+            pipeline: [
+              {
+                $match: {
+                  $expr: {
+                    $and: [
+                      { $eq: ["$productId", "$$pid"] },
+                      { $eq: ["$userId", "$$uid"] },
+                    ],
+                  },
+                },
+              },
+            ],
+            as: "favorite",
+          },
         },
-      },
-
-      // 7️⃣ Cleanup
-      {
-        $project: {
-          favorite: 0,
+        {
+          $addFields: {
+            isFavorite: { $gt: [{ $size: "$favorite" }, 0] },
+          },
         },
-      },
+        { $project: { favorite: 0 } },
+      ])
     ]);
 
     return res.status(200).json({
       status: true,
       message: "Related products fetched successfully based on category.",
+      total: totalCount,
+      totalPages: Math.ceil(totalCount / limit),
+      currentPage: page,
+      limit: limit,
       relatedProducts,
     });
   } catch (error) {
@@ -1747,11 +1770,18 @@ exports.selectedProducts = async (req, res) => {
     }
 
     const sellerId = new mongoose.Types.ObjectId(req.query.sellerId);
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.max(1, parseInt(req.query.limit) || 10);
+    const skip = (page - 1) * limit;
 
     const [seller, totalSelectedProducts, selectedProducts, liveSeller] = await Promise.all([
       Seller.findById(sellerId),
-      Product.countDocuments({ isSelect: true, seller: sellerId }),
-      Product.find({ isSelect: true, isOutOfStock: false, seller: sellerId }).select("mainImage productName price seller isSelect").sort({ createdAt: -1 }),
+      Product.countDocuments({ isSelect: true, seller: sellerId, isDeleted: { $ne: true } }),
+      Product.find({ isSelect: true, isOutOfStock: false, seller: sellerId, isDeleted: { $ne: true } })
+        .select("mainImage productName price seller isSelect")
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit),
       Seller.aggregate([
         {
           $match: {
@@ -1799,9 +1829,12 @@ exports.selectedProducts = async (req, res) => {
     return res.status(200).json({
       status: true,
       message: "Selected products retrieved successfully.",
-      totalSelectedProducts: totalSelectedProducts ? totalSelectedProducts : 0,
-      SelectedProducts: selectedProducts.length > 0 ? selectedProducts : [],
-      liveSellingHistoryId: liveSeller[0]?.liveSellingHistoryId ? liveSeller[0].liveSellingHistoryId : null,
+      total: totalSelectedProducts || 0,
+      totalPages: Math.ceil(totalSelectedProducts / limit),
+      currentPage: page,
+      limit: limit,
+      SelectedProducts: selectedProducts || [],
+      liveSellingHistoryId: liveSeller[0]?.liveSellingHistoryId || null,
     });
   } catch (error) {
     console.log(error);
@@ -2191,37 +2224,47 @@ exports.getSellerWise = async (req, res) => {
 
 exports.topSellingProducts = async (req, res) => {
   try {
-    const limit = parseInt(req.query.limit) || 10;
-    const products = await Product.aggregate([
-      {
-        $sort: { sold: -1 },
-      },
-      {
-        $limit: limit,
-      },
-      {
-        $lookup: {
-          from: "ratings",
-          localField: "_id",
-          foreignField: "productId",
-          as: "ratings",
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.max(1, parseInt(req.query.limit) || 10);
+    const skip = (page - 1) * limit;
+
+    const matchQuery = { isDeleted: { $ne: true } };
+
+    const [totalCount, products] = await Promise.all([
+      Product.countDocuments(matchQuery),
+      Product.aggregate([
+        { $match: matchQuery },
+        { $sort: { sold: -1 } },
+        { $skip: skip },
+        { $limit: limit },
+        {
+          $lookup: {
+            from: "ratings",
+            localField: "_id",
+            foreignField: "productId",
+            as: "ratings",
+          },
         },
-      },
-      {
-        $project: {
-          _id: 1,
-          productCode: 1,
-          mainImage: 1,
-          sold: 1,
-          productName: 1,
-          rating: { $ifNull: [{ $avg: "$ratings.rating" }, 0] },
+        {
+          $project: {
+            _id: 1,
+            productCode: 1,
+            mainImage: 1,
+            sold: 1,
+            productName: 1,
+            rating: { $ifNull: [{ $avg: "$ratings.rating" }, 0] },
+          },
         },
-      },
+      ])
     ]);
 
     return res.status(200).json({
       status: true,
       message: "Top selling products fetched successfully.",
+      total: totalCount,
+      totalPages: Math.ceil(totalCount / limit),
+      currentPage: page,
+      limit: limit,
       products,
     });
   } catch (error) {
@@ -2232,46 +2275,52 @@ exports.topSellingProducts = async (req, res) => {
 
 exports.popularProducts = async (req, res) => {
   try {
-    const limit = parseInt(req.query.limit) || 10;
-    const products = await Product.aggregate([
-      {
-        $sort: { searchCount: -1, review: -1 },
-      },
-      {
-        $limit: limit,
-      },
-      {
-        $lookup: {
-          from: "ratings",
-          localField: "_id",
-          foreignField: "productId",
-          as: "ratings",
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.max(1, parseInt(req.query.limit) || 10);
+    const skip = (page - 1) * limit;
+
+    const matchQuery = { isDeleted: { $ne: true } };
+
+    const [totalCount, products] = await Promise.all([
+      Product.countDocuments(matchQuery),
+      Product.aggregate([
+        { $match: matchQuery },
+        { $sort: { searchCount: -1, review: -1 } },
+        { $skip: skip },
+        { $limit: limit },
+        {
+          $lookup: {
+            from: "ratings",
+            localField: "_id",
+            foreignField: "productId",
+            as: "ratings",
+          },
         },
-      },
-      {
-        $lookup: {
-          from: "categories",
-          localField: "category",
-          foreignField: "_id",
-          as: "categoryInfo",
+        {
+          $lookup: {
+            from: "categories",
+            localField: "category",
+            foreignField: "_id",
+            as: "categoryInfo",
+          },
         },
-      },
-      {
-        $unwind: {
-          path: "$categoryInfo",
-          preserveNullAndEmptyArrays: true,
+        {
+          $unwind: {
+            path: "$categoryInfo",
+            preserveNullAndEmptyArrays: true,
+          },
         },
-      },
-      {
-        $project: {
-          _id: 1,
-          productCode: 1,
-          mainImage: 1,
-          productName: 1,
-          rating: { $ifNull: [{ $avg: "$ratings.rating" }, 0] },
-          categoryName: { $ifNull: ["$categoryInfo.name", ""] },
+        {
+          $project: {
+            _id: 1,
+            productCode: 1,
+            mainImage: 1,
+            productName: 1,
+            rating: { $ifNull: [{ $avg: "$ratings.rating" }, 0] },
+            categoryName: { $ifNull: ["$categoryInfo.name", ""] },
+          },
         },
-      },
+      ])
     ]);
 
     // 🔹 Sanitize image paths
@@ -2289,6 +2338,10 @@ exports.popularProducts = async (req, res) => {
     return res.status(200).json({
       status: true,
       message: "Popular products fetched successfully.",
+      total: totalCount,
+      totalPages: Math.ceil(totalCount / limit),
+      currentPage: page,
+      limit: limit,
       products: sanitizedProducts,
     });
   } catch (error) {

@@ -749,11 +749,19 @@ exports.likeHistoryOfReel = async (req, res) => {
       return res.status(400).json({ status: false, message: get_message(1142) });
     }
 
-    const [reel, likeHistoryOfReel] = await Promise.all([
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.max(1, parseInt(req.query.limit) || 20);
+    const skip = (page - 1) * limit;
+
+    const [reel, totalLikes, likeHistoryOfReel] = await Promise.all([
       Reel.findOne({ _id: req?.query?.reelId }),
+      LikeHistoryOfReel.countDocuments({ reelId: req?.query?.reelId }),
       LikeHistoryOfReel.find({ reelId: req?.query?.reelId })
         .populate("userId", "firstName lastName image")
-        .populate("sellerId", "firstName lastName image"),
+        .populate("sellerId", "firstName lastName image")
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit),
     ]);
 
     if (!reel) {
@@ -764,7 +772,15 @@ exports.likeHistoryOfReel = async (req, res) => {
       return res.status(200).json({ satus: false, message: "likeHistoryOfReel does not found!" });
     }
 
-    return res.status(200).json({ satus: true, message: "finally, get likeHistory of the particular reel.", likeHistoryOfReel: likeHistoryOfReel });
+    return res.status(200).json({
+      status: true,
+      message: "finally, get likeHistory of the particular reel.",
+      total: totalLikes,
+      totalPages: Math.ceil(totalLikes / limit),
+      currentPage: page,
+      limit: limit,
+      likeHistoryOfReel: likeHistoryOfReel
+    });
   } catch (error) {
     console.log(error);
     return res.status(500).json({

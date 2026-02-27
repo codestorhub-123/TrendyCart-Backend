@@ -23,13 +23,22 @@ const config = { baseURL: getApiBase() };
 
 exports.fetchActiveSubCategories = async (req, res) => {
     try {
-        const subCategories = await SubCategory.find().select("_id name image createdAt").sort({ createdAt: 1 }).lean();
+        const page = Math.max(1, parseInt(req.query.page) || 1);
+        const limit = Math.max(1, parseInt(req.query.limit) || 20);
+        const skip = (page - 1) * limit;
 
-
+        const [totalCount, subCategories] = await Promise.all([
+            SubCategory.countDocuments(),
+            SubCategory.find().select("_id name image createdAt").sort({ createdAt: 1 }).skip(skip).limit(limit).lean()
+        ]);
 
         return res.status(200).json({
             status: true,
             message: "Subcategories fetched successfully.",
+            total: totalCount,
+            totalPages: Math.ceil(totalCount / limit),
+            currentPage: page,
+            limit: limit,
             subCategories,
         });
     } catch (error) {

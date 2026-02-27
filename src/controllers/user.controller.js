@@ -586,6 +586,10 @@ exports.getProfile = async (req, res) => {
 //get all top customers (users) for admin panel(dashboard)
 exports.topCustomers = async (req, res) => {
     try {
+        const page = Math.max(1, parseInt(req.query.page) || 1);
+        const limit = Math.max(1, parseInt(req.query.limit) || 10);
+        const skip = (page - 1) * limit;
+
         const topCustomers = await User.aggregate([
             {
                 $lookup: {
@@ -611,14 +615,27 @@ exports.topCustomers = async (req, res) => {
                 $sort: { orderCount: -1 },
             },
             {
-                $limit: 10,
+                $facet: {
+                    metadata: [{ $count: "total" }],
+                    data: [
+                        { $skip: skip },
+                        { $limit: limit },
+                    ],
+                },
             },
         ]);
+
+        const totalCount = topCustomers[0].metadata[0]?.total || 0;
+        const customers = topCustomers[0].data;
 
         return res.status(200).json({
             status: true,
             message: "finally, get all top customers (users) Successfully!",
-            topCustomers,
+            total: totalCount,
+            totalPages: Math.ceil(totalCount / limit),
+            currentPage: page,
+            limit: limit,
+            topCustomers: customers,
         });
     } catch (error) {
         console.log(error);

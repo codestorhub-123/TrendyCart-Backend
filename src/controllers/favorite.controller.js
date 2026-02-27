@@ -72,9 +72,13 @@ exports.favoriteProduct = async (req, res) => {
         }
 
         const userId = new mongoose.Types.ObjectId(req.query.userId);
+        const page = Math.max(1, parseInt(req.query.page) || 1);
+        const limit = Math.max(1, parseInt(req.query.limit) || 10);
+        const skip = (page - 1) * limit;
 
-        const [user, favorite] = await Promise.all([
+        const [user, totalCount, favorite] = await Promise.all([
             User.findById(userId),
+            Favorite.countDocuments({ userId }),
             Favorite.aggregate([
                 {
                     $match: {
@@ -82,6 +86,8 @@ exports.favoriteProduct = async (req, res) => {
                     },
                 },
                 { $sort: { createdAt: -1 } },
+                { $skip: skip },
+                { $limit: limit },
                 {
                     $lookup: {
                         from: "products",
@@ -155,7 +161,15 @@ exports.favoriteProduct = async (req, res) => {
             return res.status(404).json({ status: false, message: get_message(1019) });
         }
 
-        return res.status(200).json({ status: true, message: favorite.length > 0 ? "Success" : "No data found!", favorite: favorite.length > 0 ? favorite : [] });
+        return res.status(200).json({
+            status: true,
+            message: favorite.length > 0 ? "Success" : "No data found!",
+            total: totalCount,
+            totalPages: Math.ceil(totalCount / limit),
+            currentPage: page,
+            limit: limit,
+            favorite: favorite.length > 0 ? favorite : []
+        });
     } catch (error) {
         console.log(error);
         return res.status(500).json({

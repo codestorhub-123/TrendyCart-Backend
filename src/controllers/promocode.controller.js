@@ -119,11 +119,26 @@ exports.delete = async (req, res) => {
 
 exports.getAll = async (req, res) => {
     try {
-        const promoCode = await PromoCode.find({ isDeleted: { $ne: true } }).sort({ createdAt: -1 }).lean();
+        const page = Math.max(1, parseInt(req.query.page) || 1);
+        const limit = Math.max(1, parseInt(req.query.limit) || 10);
+        const skip = (page - 1) * limit;
+
+        const [totalCount, promoCode] = await Promise.all([
+            PromoCode.countDocuments({ isDeleted: { $ne: true } }),
+            PromoCode.find({ isDeleted: { $ne: true } })
+                .sort({ createdAt: -1 })
+                .skip(skip)
+                .limit(limit)
+                .lean()
+        ]);
 
         return res.status(200).json({
             status: true,
             message: "get all promoCode Successfully.",
+            total: totalCount,
+            totalPages: Math.ceil(totalCount / limit),
+            currentPage: page,
+            limit: limit,
             promoCode: promoCode || [],
         });
     } catch (error) {
