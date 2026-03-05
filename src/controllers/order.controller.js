@@ -159,6 +159,11 @@ exports.create = async (req, res) => {
                 return res.status(409).json({ status: false, message: get_message(1115) });
             }
 
+            // check minOrderValue
+            if (workingCartData.subTotal < (promoCodeData.minOrderValue || 0)) {
+                return res.status(200).json({ status: false, message: `To use this promo code, your subtotal must be at least ₹${promoCodeData.minOrderValue}.` });
+            }
+
             if (promoCodeData.discountType === 1) {
                 totalDiscount = Math.floor((workingCartData.subTotal * promoCodeData.discountAmount) / 100);
             } else if (promoCodeData.discountType === 2) {
