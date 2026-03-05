@@ -24,7 +24,7 @@ module.exports = {
   "withdrawCharges": 10,
   "withdrawLimit": 1000,
   "createdAt": "2023-04-12T04:45:27.628Z",
-  "updatedAt": "2026-03-05T07:09:12.243Z",
+  "updatedAt": "2026-03-05T11:07:49.599Z",
   "cancelOrderCharges": 20,
   "paymentGateway": [
     {
