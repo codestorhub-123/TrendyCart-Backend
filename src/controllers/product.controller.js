@@ -1856,10 +1856,10 @@ exports.createProductByAdmin = async (req, res) => {
     const sellerId = req.body.sellerId || req.query.sellerId;
     const productCode = req.body.productCode || req.query.productCode;
 
-    if (global.settingJSON.isSellerCanAddProduct) {
-      if (req.files) deleteFiles(req.files);
-      return res.status(200).json({ status: false, message: "Currently, only Sellers can add products. Admin product addition is disabled via settings." });
-    }
+    // Logic: Admin can always add products. 
+    // If sellers are allowed (switch ON), Admin products are marked as 'Fake' (true).
+    // If sellers are disabled (switch OFF), Admin products are marked as 'Real' (false).
+    const isActuallyFake = global.settingJSON.isSellerCanAddProduct ? true : false;
 
     // Validation: Check for required fields (handling 0 for numeric fields)
     const missingFields = [];
@@ -1922,7 +1922,7 @@ exports.createProductByAdmin = async (req, res) => {
       subCategory: subCategory._id,
       seller: seller._id,
       createStatus: "Approved",
-      isAddByAdmin: true,
+      isAddByAdmin: isActuallyFake,
       shippingCharges: parseFloat(shippingCharges) || 0,
       productCode: productCode.trim(),
       quantity: Number(req.body.quantity) || 0,
