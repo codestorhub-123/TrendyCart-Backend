@@ -88,6 +88,8 @@ exports.handleSwitch = async (req, res) => {
             setting.isFakeData = !setting.isFakeData;
         } else if (req.query.type === "isCashOnDelivery") {
             setting.isCashOnDelivery = !setting.isCashOnDelivery;
+        } else if (req.query.type === "isSellerCanAddProduct") {
+            setting.isSellerCanAddProduct = !setting.isSellerCanAddProduct;
         } else {
             return res.status(400).json({ status: false, message: get_message(1121) });
         }

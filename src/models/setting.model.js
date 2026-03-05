@@ -67,6 +67,8 @@ const settingSchema = new mongoose.Schema(
       isDefault: { type: Boolean, default: false },
     }, //default currency
 
+    isSellerCanAddProduct: { type: Boolean, default: true },
+
     privateKey: { type: Object, default: {} }, //firebase.json handle notification
   },
   {

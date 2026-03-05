@@ -1391,6 +1391,11 @@ exports.create = async (req, res) => {
     console.log("req.body: ", req.body);
     console.log("req.files: ", req.files);
 
+    if (!global.settingJSON.isSellerCanAddProduct) {
+      if (req.files) deleteFiles(req.files);
+      return res.status(200).json({ status: false, message: "Currently, only the Admin can add products. Seller product addition is disabled." });
+    }
+
     if (!req.body) {
       if (req.files) deleteFiles(req.files);
       return res.status(200).json({ status: false, message: "Request body is missing." });
@@ -1850,6 +1855,11 @@ exports.createProductByAdmin = async (req, res) => {
     let attrInput = req.body.attributes || req.query.attributes;
     const sellerId = req.body.sellerId || req.query.sellerId;
     const productCode = req.body.productCode || req.query.productCode;
+
+    if (global.settingJSON.isSellerCanAddProduct) {
+      if (req.files) deleteFiles(req.files);
+      return res.status(200).json({ status: false, message: "Currently, only Sellers can add products. Admin product addition is disabled via settings." });
+    }
 
     // Validation: Check for required fields (handling 0 for numeric fields)
     const missingFields = [];
