@@ -209,10 +209,16 @@ exports.create = async (req, res) => {
         const globalTotalShipping = req.body.totalShippingCharges || 0;
         let shippingDistributed = false;
 
+        const allItems = Object.values(itemsBySeller).flat();
+        const productIds = allItems.map(i => i.productId);
+        const productsInOrder = await Product.find({ _id: { $in: productIds } }).select("isCreatedByAdmin isAddByAdmin").lean();
+        const productMap = productsInOrder.reduce((acc, p) => ({ ...acc, [p._id.toString()]: p }), {});
+
         for (const [sellerId, items] of Object.entries(itemsBySeller)) {
             const seller = await Seller.findById(sellerId);
-            const purchasedTimeadminCommissionCharges = global.settingJSON?.adminCommissionCharges || 0;
-            const purchasedTimecancelOrderCharges = global.settingJSON?.cancelOrderCharges || 0;
+            const isFakeSeller = seller?.isFake || false;
+            const purchasedTimeadminCommissionCharges = isFakeSeller ? 0 : (global.settingJSON?.adminCommissionCharges || 0);
+            const purchasedTimecancelOrderCharges = isFakeSeller ? 0 : (global.settingJSON?.cancelOrderCharges || 0);
 
             let sellerShippingCharges = items.reduce((acc, item) => acc + (item.purchasedTimeShippingCharges || 0), 0);
 
@@ -232,7 +238,11 @@ exports.create = async (req, res) => {
             const updatedItems = items.map((item, index) => {
                 const itemValue = item.purchasedTimeProductPrice * item.productQuantity;
                 const itemDiscount = parseFloat(((itemValue / sellerSubTotal) * sellerDiscount).toFixed(2));
-                const adminCommission = (item.purchasedTimeProductPrice * purchasedTimeadminCommissionCharges) / 100;
+                const productData = productMap[item.productId.toString()];
+                const isProductByAdmin = productData?.isCreatedByAdmin || productData?.isAddByAdmin || false;
+                const effectiveCommissionRate = isProductByAdmin ? 0 : (purchasedTimeadminCommissionCharges || 0);
+                const effectiveCancelRate = isProductByAdmin ? 0 : (purchasedTimecancelOrderCharges || 0);
+                const adminCommission = (item.purchasedTimeProductPrice * effectiveCommissionRate) / 100;
                 const commissionPerProductQuantity = adminCommission * item.productQuantity;
                 quantityTotal += parseInt(item?.productQuantity);
 
@@ -246,6 +256,8 @@ exports.create = async (req, res) => {
                     ...item,
                     itemDiscount: itemDiscount,
                     commissionPerProductQuantity: commissionPerProductQuantity,
+                    purchasedTimeadminCommissionCharges: effectiveCommissionRate,
+                    purchasedTimecancelOrderCharges: effectiveCancelRate,
                     purchasedTimeShippingCharges: itemShipping,
                     status: "Pending",
                     date: new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }),
@@ -1350,5 +1362,148 @@ exports.updateOrder = async (req, res) => {
         session.endSession();
         console.error("updateOrder error:", error);
         return res.status(500).json({ status: false, message: error.message || "Internal Server Error" });
+    }
+};
+
+// ==========================================
+// Admin Own Store APIs
+// ==========================================
+
+exports.getAdminOwnOrders = async (req, res) => {
+    try {
+        const page = parseInt(req.query.page) || 1;
+        const limitVal = parseInt(req.query.limit) || 10;
+        const status = req.query.status || "All";
+        const skip = (page - 1) * limitVal;
+
+        const adminProducts = await Product.find({ isCreatedByAdmin: true }).select("_id").lean();
+        const adminProductIds = adminProducts.map((p) => p._id);
+
+        let matchQuery = {
+            "items.productId": { $in: adminProductIds },
+        };
+
+        if (status !== "All") {
+            matchQuery["items.status"] = status;
+        }
+
+        const [orders, countResult] = await Promise.all([
+            Order.aggregate([
+                { $unwind: "$items" },
+                { $match: matchQuery },
+                { $sort: { createdAt: -1 } },
+                { $skip: skip },
+                { $limit: limitVal },
+                {
+                    $lookup: {
+                        from: "users",
+                        localField: "userId",
+                        foreignField: "_id",
+                        as: "user",
+                    },
+                },
+                { $unwind: { path: "$user", preserveNullAndEmptyArrays: true } },
+                {
+                    $lookup: {
+                        from: "products",
+                        localField: "items.productId",
+                        foreignField: "_id",
+                        as: "productData",
+                    },
+                },
+                { $unwind: { path: "$productData", preserveNullAndEmptyArrays: true } },
+                {
+                    $project: {
+                        _id: 1,
+                        orderId: 1,
+                        item: "$items",
+                        shippingAddress: 1,
+                        paymentGateway: 1,
+                        paymentStatus: 1,
+                        finalTotal: 1,
+                        user: {
+                            firstName: "$user.firstName",
+                            lastName: "$user.lastName",
+                            mobileNumber: "$user.mobileNumber",
+                            uniqueId: "$user.uniqueId",
+                        },
+                        product: {
+                            productName: "$productData.productName",
+                            mainImage: "$productData.mainImage",
+                        },
+                        createdAt: { $dateToString: { format: "%d/%m/%Y", date: "$createdAt", timezone: "Asia/Kolkata" } },
+                    },
+                },
+            ]),
+            Order.aggregate([{ $unwind: "$items" }, { $match: matchQuery }, { $count: "total" }]),
+        ]);
+
+        return res.status(200).json({
+            status: true,
+            message: "Admin's own orders retrieved successfully",
+            total: countResult[0]?.total || 0,
+            totalPages: Math.ceil((countResult[0]?.total || 0) / limitVal),
+            currentPage: page,
+            orders: orders,
+        });
+    } catch (error) {
+        console.error("getAdminOwnOrders error:", error);
+        return res.status(500).json({ status: false, message: "Internal Server Error" });
+    }
+};
+
+exports.getAdminOwnStats = async (req, res) => {
+    try {
+        const adminProducts = await Product.find({ isCreatedByAdmin: true }).select("_id").lean();
+        const adminProductIds = adminProducts.map((p) => p._id);
+
+        const stats = await Order.aggregate([
+            { $unwind: "$items" },
+            {
+                $match: {
+                    "items.productId": { $in: adminProductIds },
+                },
+            },
+            {
+                $group: {
+                    _id: null,
+                    totalOrders: { $sum: 1 },
+                    pendingOrders: {
+                        $sum: { $cond: [{ $eq: ["$items.status", "Pending"] }, 1, 0] },
+                    },
+                    deliveredOrders: {
+                        $sum: { $cond: [{ $eq: ["$items.status", "Delivered"] }, 1, 0] },
+                    },
+                    totalEarnings: {
+                        $sum: {
+                            $cond: [
+                                { $eq: ["$items.status", "Delivered"] },
+                                { $add: [{ $multiply: ["$items.purchasedTimeProductPrice", "$items.productQuantity"] }, "$items.purchasedTimeShippingCharges"] },
+                                0,
+                            ],
+                        },
+                    },
+                },
+            },
+        ]);
+
+        const result = stats[0] || {
+            totalOrders: 0,
+            pendingOrders: 0,
+            deliveredOrders: 0,
+            totalEarnings: 0,
+        };
+
+        return res.status(200).json({
+            status: true,
+            message: "Admin store statistics retrieved successfully",
+            stats: {
+                ...result,
+                totalProducts: adminProductIds.length,
+            },
+        });
+    } catch (error) {
+        console.error("getAdminOwnStats error:", error);
+        return res.status(500).json({ status: false, message: "Internal Server Error" });
     }
 };

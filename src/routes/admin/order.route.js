@@ -274,5 +274,9 @@ route.get('/recentOrders', controller.recentOrders);
  */
 route.patch('/updateOrder', controller.updateOrder);
 
+// Admin Own Store Routes
+route.get('/getAdminOwnOrders', controller.getAdminOwnOrders);
+route.get('/getAdminOwnStats', controller.getAdminOwnStats);
+
 module.exports = route;
 

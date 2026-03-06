@@ -1923,6 +1923,7 @@ exports.createProductByAdmin = async (req, res) => {
       seller: seller._id,
       createStatus: "Approved",
       isAddByAdmin: isActuallyFake,
+      isCreatedByAdmin: true,
       shippingCharges: parseFloat(shippingCharges) || 0,
       productCode: productCode.trim(),
       quantity: Number(req.body.quantity) || 0,

@@ -41,6 +41,7 @@ const productSchema = new mongoose.Schema(
     isNewCollection: { type: Boolean, default: false },
     isSelect: { type: Boolean, default: false }, //when seller is live then seller took the selected products and go for live
     isAddByAdmin: { type: Boolean, default: false }, //fake product add by the admin
+    isCreatedByAdmin: { type: Boolean, default: false },
     isUpdateByAdmin: { type: Boolean, default: false },
 
     seller: { type: mongoose.Schema.Types.ObjectId, ref: "Seller" },

@@ -4,11 +4,23 @@ const { get_message } = require("../../utils/message");
 // GET SETTING
 exports.getSetting = async (req, res) => {
     try {
-        if (!global.settingJSON || Object.keys(global.settingJSON).length === 0) {
+        const allSettings = await Setting.find().sort({ updatedAt: -1 });
+        console.log("Total Setting Documents:", allSettings.length);
+
+        allSettings.forEach((s, index) => {
+            console.log(`Setting ${index}: ID=${s._id}, Comm=${s.adminCommissionCharges}, isSellerCanAdd=${s.isSellerCanAddProduct}, updatedAt=${s.updatedAt}`);
+        });
+
+        const setting = allSettings[0];
+        if (!setting) {
             return res.status(404).json({ status: false, message: get_message(1171) });
         }
 
-        return res.status(200).json({ status: true, message: "Success", setting: global.settingJSON });
+        // Sync global settings
+        global.settingJSON = setting;
+        updateSettingFile(setting);
+
+        return res.status(200).json({ status: true, message: "Success", setting });
     } catch (error) {
         console.log(error);
         return res.status(500).json({ status: false, error: error.message || "Internal Server Error" });
@@ -48,6 +60,7 @@ exports.update = async (req, res) => {
         setting.withdrawCharges = parseInt(req.body.withdrawCharges) ? parseInt(req.body.withdrawCharges) : setting.withdrawCharges;
         setting.withdrawLimit = parseInt(req.body.withdrawLimit) ? parseInt(req.body.withdrawLimit) : setting.withdrawLimit;
         setting.flutterWaveId = req.body.flutterWaveId ? req.body.flutterWaveId : setting.flutterWaveId;
+        setting.isSellerCanAddProduct = typeof req.body.isSellerCanAddProduct !== "undefined" ? (req.body.isSellerCanAddProduct === "true" || req.body.isSellerCanAddProduct === true) : setting.isSellerCanAddProduct;
         setting.privateKey = req.body.privateKey ? JSON.parse(req.body.privateKey.trim()) : setting.privateKey;
         await setting.save();
 
